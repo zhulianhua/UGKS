@@ -20,29 +20,30 @@ The Makefile is provided for those who have gnu make installed. If you are
 using any IDE (e.g. Visual Studio), use the compiling function provided by the
 IDE
 
-Note: openmp and intel fortran compiler is used by default.
+Note: openmp and intel fortran compiler is used by default. DO NOT type the
+prompt symbol $
 
 1. make both 1D and 2D program
 
-    make all
+        $ make
 
 2. make 1D only
 
-    make 1D
+        $ make 1D
 
 3. make 2D only
 
-    make 2D
+        $ make 2D
 
 4. make both 1D and 2D WITHOUT openmp, and WITH gfortran
 
-    make all OMP=no FC=gfortran
+        $ make OMP=no FC=gfortran
 
 5. clean
-    
-    make clean
+ 
+        $ make clean
 
-LICENSE
+License
 ===============
 Copyright (C) 2012 Wang Ruijie <lainme993@gmail.com>
 
