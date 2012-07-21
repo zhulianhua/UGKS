@@ -1,13 +1,8 @@
 Description
 ===============
 This program provides two codes for solving gas flow problem based on the
-Unified Gas-Kinetic Scheme. For detail, please refer to
-
-1. K. Xu and J.C. Huang, "A unified gas-kinetic scheme for continuum and
-rarefied flows", J. Comput. Physics, vol. 229 (2010), pp. 7747-7764 (October).
-2. J.C. Huang, K. Xu, and P.B. Yu, "A Unified Gas-kinetic Scheme for Continuum
-and Rarefied Flows II: Multi-dimensional Cases", Communications in
-Computational Physics, vol. 3, No. 3, pp. 662-690, September (2012).
+Unified Gas-Kinetic Scheme. For detail, please refer to the manual in doc
+directory.
 
 For the source file
 
@@ -20,7 +15,7 @@ The Makefile is provided for those who have gnu make installed. If you are
 using any IDE (e.g. Visual Studio), use the compiling function provided by the
 IDE
 
-Note: openmp and intel fortran compiler is used by default. DO NOT type the
+Note: openmp and Intel Fortran compiler is used by default. DO NOT type the
 prompt symbol $
 
 1. make both 1D and 2D program
