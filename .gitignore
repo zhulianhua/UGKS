@@ -1,0 +1,4 @@
+*.swp
+doc/*
+!doc/*.tex
+!doc/*.pdf

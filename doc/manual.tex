@@ -1,0 +1,114 @@
+% This file is the user manual for the UGKS1D and UGKS2D code
+%
+% Copyright (C) 2012 Wang Ruijie <lainme993@gmail.com> 
+%
+% Permission is granted to copy, distribute and/or modify this document
+% under the terms of the GNU Free Documentation License, Version 1.3 or
+% any later version published by the Free Software Foundation; with no
+% Invariant Sections, with no Front-Cover Texts, and with no Back-Cover
+% Texts.  A copy of the license is included in the section entitled
+% ``GNU Free Documentation License.''
+
+\documentclass{book}
+\usepackage{hyperref}
+\usepackage{parskip}
+\usepackage{amsmath}
+%no indention
+\setlength\parindent{0pt}
+
+\begin{document}
+%title page
+\title{User Manual for UGKS1D and UGKS2D Code}
+\author{Wang Ruijie\\\href{mailto:lainme993@gmail.com}{lainme993@gmail.com}}
+\maketitle
+
+%license statement
+\thispagestyle{empty}
+Copyright \copyright\ 2012 Wang Ruijie
+
+Permission is granted to copy, distribute and/or modify this document
+under the terms of the GNU Free Documentation License, Version 1.3 or
+any later version published by the Free Software Foundation; with no
+Invariant Sections, no Front-Cover Texts, and no Back-Cover Texts.  A
+copy of the license is included in the section entitled
+\htmlref{GNU Free Documentation License}{chap:fdl}
+
+%table of contents
+\frontmatter
+\tableofcontents
+
+\mainmatter
+%UGKS method
+\chapter{Unified Gas-Kinetic Scheme}
+This chapter describes the Unified Gas-Kinetic Scheme published in \cite{Xu2010,Xu2011}. This is a 1D formulation. The 2D formulation with directional splitting is described in \cite{Huang2012}, and can be extended to a truely multidimensional formulation.
+\section{Model equation}
+The model equation is the BGK-Shakhov model. In one dimensioanl case,
+\begin{equation}
+    \frac{\partial f}{\partial t}+u\frac{\partial f}{\partial x}=\frac{f^+-f}{\tau}
+\end{equation}
+where $f$ is the distribution function, $u$ is partical velocity, $\tau$ is particle collision time and $f^+$ is the modified equilibrium distribution function.
+
+The collision time is given by $\tau=\mu/p$, where $\mu$ is the dynamic viscosity and $p$ is the pressure
+
+The modified equilibrium distribution is
+\begin{equation}
+    f^+ = g\left[1+(1-\Pr){\bf c}\cdot{\bf q}\left(\frac{c^2}{RT}-5\right)/(5pRT)\right]=g+g^+
+\end{equation}
+where $g$ is the Maxwellian distribution, $\Pr$ is the Prandtl number, ${\bf c}=u-U$ is the random velocity, $U$ is the macroscopic velocity, $q$ is heat flux, $R$ is gas constant and $T$ is the temperature.
+
+The Maxwellian distribution for 1D problem is
+\begin{equation}
+    g=\rho\left(\frac{\lambda}{\pi}\right)^{\frac{K+1}{2}}e^{-\lambda((u-U)^2+\xi^2)}
+\end{equation}
+where $\rho$ is density, $\lambda=m/2kT$, $m$ is molecule mass, $k$ is Boltzmann constant, $K$ is the number of internal degree of freedom and $\xi^2=\xi_1^2+\xi_2^2...+\xi_K^2$. For example, a monatomic gas at 1D problem has $K=2$ to account for the motion in $y,z$ direction, and $\xi^2=v^2+w^2$, where $v,w$ are particle velocity in $y,z$ direction.
+
+The collision invariants are $\psi=(1,u,1/2(u^2+\xi^2))^T$, and the macroscopic variables can be calculated via
+\begin{equation}
+    w=\begin{pmatrix} \rho\\ \rho U\\ \rho E \end{pmatrix} = \int \psi_\alpha fd\Xi,\quad \alpha=1,2,3
+\end{equation}
+\begin{equation}
+    p=\frac{1}{3}\int [(u-U)^2+\xi^2]fd\Xi
+\end{equation}
+\begin{equation}
+    q=\frac{1}{2}\int (u-U)[(u-U)^2+\xi^2]fd\Xi
+\end{equation}
+where $E$ is total energy and $d\Xi=dud\xi$
+
+
+\section{Reduced distribution function}
+\section{Nondimensionalization}
+\section{Interface flux}
+\section{Update cell averaged value}
+\section{Boundary condition}
+
+%usage
+\chapter{Usage}
+This chapter describes how to compile the source code and documentation.
+Currently, it's only tested under Linux.
+\section{Compile under *nix}
+\section{Compile under windows}
+
+%UGKS1D code
+\chapter{UGKS1D Code}
+This chapter describes the structure and the included shock structure test case at Ma=8.0 in the UGKS1D code.
+
+%UGKS2D code
+\chapter{UGKS2D Code}
+This chapter describes the structure and the included lid-driven cavity test case in the UGKS2D code.
+\section{test}
+test
+
+%license
+\backmatter
+\input{fdl}
+
+%References
+\cleardoublepage
+\phantomsection
+\addcontentsline{toc}{chapter}{Bibliography}
+\begin{thebibliography}{1}
+    \bibitem{Xu2010} Xu, K., Huang, J.C.: A unified gas-kinetic scheme for continuum and rarefied flows. Journal of Computational Physics. {\bf 229}, 7747-7764 (2010) DOI 10.1016/j.jcp.2010.06.032.
+    \bibitem{Xu2011} Xu, K., Huang, J.C.: An improved unified gas-kinetic scheme and the study of shock structures. IMA Journal of Applied Mathematics. {\bf 76}, 698-711 (2011) DOI 10.1093/imamat/hxr002.
+    \bibitem{Huang2012} Huang, J.C., Xu, K., Yu, P.B.: A Unified Gas-kinetic Scheme for Continuum and Rarefied Flows II: Multi-dimensional Cases. Communications in Computational Physics. {\bf 12}, 662-690 (2012) DOI 10.4208/cicp.030511.220911a.
+\end{thebibliography}
+\end{document}
