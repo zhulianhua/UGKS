@@ -3,3 +3,5 @@ doc/*
 !doc/*.tex
 !doc/*.pdf
 !doc/*.bib
+*.vim
+tags
