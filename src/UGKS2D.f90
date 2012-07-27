@@ -115,6 +115,7 @@ module global_data
     !discrete velocity space
     !--------------------------------------------------
     integer :: unum,vnum !number of velocity points for u and v
+    real(kind=RKD) :: umax,vmax !maximum micro velocity
     type(quad),allocatable,dimension(:) :: uspace,vspace !u and v discrete velocity space
 end module global_data
 
@@ -191,6 +192,51 @@ end module tools
 !>UGKS solver
 !--------------------------------------------------
 module solver
+    use global_data
+    use tools
+    implicit none
+    contains
+        !--------------------------------------------------
+        !>calculate time step
+        !--------------------------------------------------
+        subroutine timestep()
+            real(kind=8) :: tmax !max 1/dt allowed
+            real(kind=8) :: sos !speed of sound
+            real(kind=8) :: prim(4) !primary variables
+            integer :: i,j
+
+            !set initial value
+            tmax = 0.0
+
+            !$omp parallel do private(i,j,sos,prim) reduction(max:tmax)
+            do j=iymin,iymax
+                do i=ixmin,ixmax
+                    !convert conservative variables to primary variables
+                    call convert_w_prim(ctr(i,j)%w,prim)
+
+                    !sound speed
+                    sos = get_sos(prim)
+
+                    !maximum velocity
+                    prim(2) = max(umax,abs(prim(2)))+sos
+                    prim(3) = max(vmax,abs(prim(3)))+sos
+
+                    !maximum 1/dt allowed
+                    tmax = max(tmax,(ctr(i,j)%length(2)*prim(2)+ctr(i,j)%length(1)*prim(3))/ctr(i,j)%area)
+                end do
+            end do 
+            !$omp end parallel do
+
+            !time step
+            dt = cfl/tmax
+        end subroutine timestep
+
+        !--------------------------------------------------
+        !>calculate the slope of distribution function
+        !--------------------------------------------------
+        subroutine interpolation()
+
+        end subroutine interpolation
 end module solver
 
 !--------------------------------------------------
@@ -271,6 +317,10 @@ module io
 
             !set grid points and weight for v-velocity (the same)
             vspace = uspace
+
+            !store the maximum micro velocity
+            umax = maxval(abs(uspace%s))
+            vmax = maxval(abs(vspace%s))
         end subroutine init_velocity
 
         !--------------------------------------------------
@@ -365,4 +415,28 @@ program main
 
     !initialization
     call init() 
+
+    !set initial value
+    iter = 1 !number of iteration
+    sim_time = 0.0 !simulation time
+
+    !iteration
+    do while(.true.)
+        call timestep() !calculate time step
+        call interpolation() !calculate the slope of distribution function
+        call evolution() !calculate flux across the interfaces
+        call update() !update cell averaged value
+
+        !check if exit
+        if (all(res<eps)) exit
+
+        !write iteration situation every 10 iterations
+        if (mod(iter,10)==0) then
+            write(*,"(A18,I15,2E15.7)") "iter,sim_time,dt:",iter,sim_time,dt
+            write(*,"(A18,4E15.7)") "res:",res
+        end if
+
+        iter = iter+1
+        sim_time = sim_time+dt
+    end do
 end program main
