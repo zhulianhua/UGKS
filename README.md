@@ -11,9 +11,10 @@ For the source file
 
 Pre-requirements
 ================
-1. Fortran compiler: ifort or gfortran supporting Fortran 2003
-2. Latex: only for re-compilation of the manual, requiring hyperref, parskip,
-amsmath, amssymb, fullpage and appendix packages
+1. Fortran compiler: `ifort` or `gfortran` supporting Fortran 2003
+2. Latex installation: only for re-compilation of the manual, requiring
+`hyperref`, `parskip`, `amsmath`, `amssymb`, `fullpage` and `appendix`
+packages. Also requires `bibtex`, `dvips` and `ps2pdf`
 
 Usage
 ================
