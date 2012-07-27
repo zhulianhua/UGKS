@@ -42,7 +42,7 @@ prompt symbol $
 
 5. Re-generate manual
 
-        $ make doc
+        $ make manual
 
 6. Clean
  
