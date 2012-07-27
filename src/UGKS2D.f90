@@ -109,6 +109,7 @@ module global_data
     integer :: ngrid !number of total grids
     type(cell_center),allocatable,dimension(:,:) :: ctr !cell centers
     type(cell_interface),allocatable,dimension(:,:) :: vface,hface !vertical and horizontal interfaces
+    real(kind=RKD) :: bc_W(4),bc_E(4),bc_S(4),bc_N(4) !boundary conditions at west,east,south and north boundary
 
     !--------------------------------------------------
     !discrete velocity space
@@ -121,6 +122,69 @@ end module global_data
 !>define some commonly used functions/subroutines
 !--------------------------------------------------
 module tools
+    use global_data
+    implicit none
+    contains
+        !--------------------------------------------------
+        !>convert primary variables to conservative variables
+        !>@param[in] prim primary variables
+        !>@param[out] w conservative variables
+        !--------------------------------------------------
+        subroutine convert_prim_w(prim,w)
+            real(kind=RKD),intent(in) :: prim(4)
+            real(kind=RKD),intent(out) :: w(4)
+
+            w(1) = prim(1)
+            w(2) = prim(1)*prim(2)
+            w(3) = prim(1)*prim(3)
+            w(4) = 0.5*prim(1)/prim(4)/(gam-1.0)+0.5*prim(1)*(prim(2)**2+prim(3)**2)
+        end subroutine convert_prim_w
+
+        !--------------------------------------------------
+        !>obtain discretized Maxwellian distribution
+        !>@param[in] prim primary variables in global frame
+        !>@param[out] h,b reduced Maxwellian distribution
+        !--------------------------------------------------
+        subroutine discrete_maxwell(prim,h,b)
+            real(kind=8),intent(in) :: prim(4)
+            real(kind=8),dimension(:,:),intent(out) :: h,b
+            real(kind=8) :: temp
+            integer :: i,j
+
+            temp = prim(1)*(prim(4)/PI)
+            forall(i=1:unum,j=1:vnum)
+                h(i,j) = temp*exp(-prim(4)*((uspace(i)%s-prim(2))**2+(vspace(j)%s-prim(3))**2))
+                b(i,j) = h(i,j)*ck/(2.0*prim(4))
+            end forall
+        end subroutine discrete_maxwell
+
+        !--------------------------------------------------
+        !>convert macro variables from global frame to local
+        !>@param[in] w_local macro variables in local frame
+        !>@param[out] w_global macro variables in global frame
+        !>@param[in] cosx,cosy directional cosine
+        !--------------------------------------------------
+        subroutine global_frame(w_local,w_global,cosx,cosy)
+            real(kind=8),intent(in) :: w_local(2) !variables in local frame
+            real(kind=8),intent(out) :: w_global(2) !variables in global frame
+            real(kind=8),intent(in) :: cosx,cosy !directional cosine
+            real(kind=8) :: wx,wy !variables in x and y direction
+
+            w_global(1) = w_local(1)*cosx-w_local(2)*cosy
+            w_global(2) = w_local(1)*cosy+w_local(2)*cosx
+        end subroutine global_frame
+
+        !--------------------------------------------------
+        !>obtain ratio of specific heat
+        !>@param[in] ck internal degree of freedom
+        !>@return get_gam ratio of specific heat
+        !--------------------------------------------------
+        function get_gamma(ck)
+            integer,intent(in) :: ck
+            real(kind=RKD) :: get_gamma
+
+            get_gamma = float(ck+4)/float(ck+2)
+        end function get_gamma
 end module tools
 
 !--------------------------------------------------
@@ -159,7 +223,7 @@ module io
             kn = 1.0 !Knudsen number
             omega = 0.81 !temperature dependence index in HS/VHS model
             pr = 2.0/3.0 !Prandtl number
-            gam = get_gam(ck) !ratio of specific heat
+            gam = get_gamma(ck) !ratio of specific heat
             !geometry
             xlength = 1.0
             ylength = 1.0
@@ -199,10 +263,10 @@ module io
 
             !set grid points and weight for u-velocity
             do i=unum/2+1,unum
-                uspace(i)%s = coords
-                uspace(i)%w = weight
-                uspace(unum+1-i)%s = -coords
-                uspace(unum+1-i)%w = weight
+                uspace(i)%s = coords(i-unum/2)
+                uspace(i)%w = weight(i-unum/1)
+                uspace(unum+1-i)%s = -coords(i-unum/2)
+                uspace(unum+1-i)%w = weight(i-unum/2)
             end do
 
             !set grid points and weight for v-velocity (the same)
@@ -215,7 +279,7 @@ module io
         !>@param[in] xlength,ylength domain length in x and y direction
         !--------------------------------------------------
         subroutine init_geometry(xlength,ylength,xnum,ynum)
-            real(kind=RKD),intent(in) :: xlength,ylenth
+            real(kind=RKD),intent(in) :: xlength,ylength
             integer,intent(in) :: xnum,ynum
             real(kind=RKD) :: dx,dy !cell length in x and y direction
             real(kind=RKD) :: area !cell area
@@ -242,8 +306,8 @@ module io
             forall(i=ixmin:ixmax,j=iymin:iymax) !cell center
                 ctr(i,j)%x = (i-0.5)*dx
                 ctr(i,j)%y = (j-0.5)*dy
-                ctr(i,j)%ixlength = dx
-                ctr(i,j)%iylength = dy
+                ctr(i,j)%length(1) = dx
+                ctr(i,j)%length(2) = dy
                 ctr(i,j)%area = area
             end forall
 
@@ -265,7 +329,7 @@ module io
         !>@param[in] init_gas initial condition
         !--------------------------------------------------
         subroutine init_flow_field(init_gas)
-            real(kind=RKD),intent(in) :: init_gas
+            real(kind=RKD),intent(in) :: init_gas(4)
             real(kind=RKD),allocatable,dimension(:,:) :: H,B !reduced Maxwellian distribution functions
             real(kind=RKD) :: w(4) !conservative variables
             integer :: i,j
@@ -278,7 +342,7 @@ module io
             call convert_prim_w(init_gas,w)
 
             !obtain discretized Maxwellian distribution H and B
-            call discrete_maxwell(init_gas,H,B,real(1,8),real(0,8))
+            call discrete_maxwell(init_gas,H,B)
 
             !initial condition
             forall(i=ixmin:ixmax,j=iymin:iymax)
