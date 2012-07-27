@@ -1,0 +1,59 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.8	//
+.   Calculate $W_0$	doc/manual.tex	/^\\subsubsection*{Calculate $W_0$}$/;"	s
+.   Calculate $a^L,a^R$	doc/manual.tex	/^\\subsubsection*{Calculate $a^L,a^R$}$/;"	s
+.   Calculate ${\partial W	doc/manual.tex	/^\\subsubsection*{Calculate ${\\partial W}\/{\\partial t}$ and $A$}$/;"	s
+.   Calculate collision time and some time integration terms	doc/manual.tex	/^\\subsubsection*{Calculate collision time and some time integration terms}$/;"	s
+.   Calculate the flux of conservative variables related to $g_0$	doc/manual.tex	/^\\subsubsection*{Calculate the flux of conservative variables related to $g_0$}$/;"	s
+.   Calculate the remaining flux	doc/manual.tex	/^\\subsubsection*{Calculate the remaining flux}$/;"	s
+.   Reconstruct initial distribution	doc/manual.tex	/^\\subsubsection*{Reconstruct initial distribution}$/;"	s
+. The algorithm	doc/manual.tex	/^\\subsection{The algorithm}$/;"	s
+. The numerical procedure	doc/manual.tex	/^\\subsection{The numerical procedure}$/;"	s
+Boundary condition	doc/manual.tex	/^\\section{Boundary condition}$/;"	s
+Calculation of interface flux	doc/manual.tex	/^\\section{Calculation of interface flux}$/;"	s
+Compile under *nix	doc/manual.tex	/^\\section{Compile under *nix}$/;"	s
+Compile under windows	doc/manual.tex	/^\\section{Compile under windows}$/;"	s
+Model equation	doc/manual.tex	/^\\section{Model equation}$/;"	s
+Moments of $<au^n\psi>$	doc/manual.tex	/^    \\section*{Moments of $<au^n\\psi>$}$/;"	s
+Moments of $<u^n\xi^m\psi>$	doc/manual.tex	/^    \\section*{Moments of $<u^n\\xi^m\\psi>$}$/;"	s
+Moments of $\xi^m$	doc/manual.tex	/^    \\section*{Moments of $\\xi^m$}$/;"	s
+Moments of $u^n$	doc/manual.tex	/^    \\section*{Moments of $u^n$}$/;"	s
+Nondimensionalization	doc/manual.tex	/^\\section{Nondimensionalization}$/;"	s
+Solution algorithm	doc/manual.tex	/^\\section{Solution algorithm}$/;"	s
+Time step and reconstruction	doc/manual.tex	/^\\section{Time step and reconstruction}$/;"	s
+Update cell averaged value	doc/manual.tex	/^\\section{Update cell averaged value}$/;"	s
+appendix:moments	doc/manual.tex	/^    \\label{appendix:moments}$/;"	l
+chap:fdl	doc/fdl.tex	/^\\label{chap:fdl}$/;"	l
+eq:bgk-shakhov	doc/manual.tex	/^    \\label{eq:bgk-shakhov}$/;"	l
+eq:bgk-shakhov_discrete	doc/manual.tex	/^    \\label{eq:bgk-shakhov_discrete}$/;"	l
+eq:conservative_discrete	doc/manual.tex	/^    \\label{eq:conservative_discrete}$/;"	l
+eq:conserved_var	doc/manual.tex	/^    \\label{eq:conserved_var}$/;"	l
+eq:csolution	doc/manual.tex	/^    \\label{eq:csolution}$/;"	l
+eq:csolution_final	doc/manual.tex	/^    \\label{eq:csolution_final}$/;"	l
+eq:csolution_interface	doc/manual.tex	/^    \\label{eq:csolution_interface}$/;"	l
+eq:eos	doc/manual.tex	/^    \\label{eq:eos}$/;"	l
+eq:f0	doc/manual.tex	/^    \\label{eq:f0}$/;"	l
+eq:g_interface	doc/manual.tex	/^    \\label{eq:g_interface}$/;"	l
+eq:heatflux	doc/manual.tex	/^    \\label{eq:heatflux}$/;"	l
+eq:micro_slope	doc/manual.tex	/^    \\label{eq:micro_slope}$/;"	l
+eq:microslope_space	doc/manual.tex	/^    \\label{eq:microslope_space}$/;"	l
+eq:microslope_time	doc/manual.tex	/^    \\label{eq:microslope_time}$/;"	l
+eq:reduced_g	doc/manual.tex	/^    \\label{eq:reduced_g}$/;"	l
+eq:reduced_gp	doc/manual.tex	/^    \\label{eq:reduced_gp}$/;"	l
+eq:solve_g0	doc/manual.tex	/^    \\label{eq:solve_g0}$/;"	l
+eq:solve_wt	doc/manual.tex	/^    \\label{eq:solve_wt}$/;"	l
+eq:viscosity	doc/manual.tex	/^    \\label{eq:viscosity}$/;"	l
+global_data	src/UGKS1D.f90	/^module global_data$/;"	m
+init	src/UGKS1D.f90	/^    subroutine init(/;"	s	module:io
+io	src/UGKS1D.f90	/^module io$/;"	m
+main	src/UGKS1D.f90	/^program main$/;"	p
+pic:flux	doc/manual.tex	/^    \\label{pic:flux}$/;"	l
+pic:solution	doc/manual.tex	/^    \\label{pic:solution}$/;"	l
+pic:update	doc/manual.tex	/^    \\label{pic:update}$/;"	l
+solver	src/UGKS1D.f90	/^module solver$/;"	m
+test	doc/manual.tex	/^\\section{test}$/;"	s
+tools	src/UGKS1D.f90	/^module tools$/;"	m
