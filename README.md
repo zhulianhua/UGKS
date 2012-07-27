@@ -1,5 +1,5 @@
 Description
-===============
+================
 This program provides two codes for solving gas flow problem based on the
 Unified Gas-Kinetic Scheme. For detail, please refer to the manual in doc
 directory.
@@ -9,37 +9,47 @@ For the source file
 1. UGKS1D.f90 is for 1D shock structure calculation at Ma=8
 2. UGKS2D.f90 is for 2D lid-driven cavity flow calculation
 
+Pre-requirements
+================
+1. Fortran compiler: ifort or gfortran supporting Fortran 2003
+2. Latex: only for re-compilation of the manual, requiring hyperref, parskip,
+amsmath, amssymb, fullpage and appendix packages
+
 Usage
-===============
+================
 The Makefile is provided for those who have gnu make installed. If you are
 using any IDE (e.g. Visual Studio), use the compiling function provided by the
 IDE
 
-Note: openmp and Intel Fortran compiler is used by default. DO NOT type the
+Note: openmp and Intel Fortran compiler is used by default. **DO NOT** type the
 prompt symbol $
 
-1. make both 1D and 2D program
+1. Make both 1D and 2D program
 
         $ make
 
-2. make 1D only
+2. Make 1D only
 
         $ make 1D
 
-3. make 2D only
+3. Make 2D only
 
         $ make 2D
 
-4. make both 1D and 2D WITHOUT openmp, and WITH gfortran
+4. Make both 1D and 2D **WITHOUT** openmp, and **WITH** gfortran
 
         $ make OMP=no FC=gfortran
 
-5. clean
+5. Re-generate manual
+
+        $ make doc
+
+6. Clean
  
         $ make clean
 
 License
-===============
+================
 Copyright (C) 2012 Wang Ruijie <lainme993@gmail.com>
 
 This program is free software: you can redistribute it and/or modify it under
