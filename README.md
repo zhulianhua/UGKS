@@ -14,7 +14,8 @@ Pre-requirements
 1. Fortran compiler: `ifort` or `gfortran` supporting Fortran 2003
 2. Latex installation: only for re-compilation of the manual, requiring
 `hyperref`, `parskip`, `amsmath`, `amssymb`, `fullpage` and `appendix`
-packages. Also requires `bibtex`, `dvips` and `ps2pdf`
+packages and also `bibtex`. If you use the Makefile provided to
+re-compile the manual, `dvips` and `ps2pdf` are needed.
 
 Usage
 ================
