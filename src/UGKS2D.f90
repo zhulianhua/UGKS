@@ -32,7 +32,7 @@ module global_data
     real(kind=RKD),parameter :: PI = 4.0*atan(1.0) !Pi
     real(kind=RKD),parameter :: SMV = tiny(real(1.0,8)) !small value to avoid 0/0
     real(kind=RKD),parameter :: UP = 1.0 !used in sign() function
-    real(kind=RKD) :: cfl !global cfl number
+    real(kind=RKD) :: cfl !global CFL number
     real(kind=RKD) :: dt !global time step
     real(kind=RKD) :: res(4) !residual
     real(kind=RKD) :: eps !convergence criteria
@@ -178,7 +178,7 @@ module tools
         !--------------------------------------------------
         !>obtain ratio of specific heat
         !>@param[in] ck internal degree of freedom
-        !>@return get_gam ratio of specific heat
+        !>@return get_gamma ratio of specific heat
         !--------------------------------------------------
         function get_gamma(ck)
             integer,intent(in) :: ck
@@ -208,7 +208,8 @@ module solver
             !set initial value
             tmax = 0.0
 
-            !$omp parallel do private(i,j,sos,prim) reduction(max:tmax)
+            !$omp parallel 
+            !$omp do private(i,j,sos,prim) reduction(max:tmax)
             do j=iymin,iymax
                 do i=ixmin,ixmax
                     !convert conservative variables to primary variables
@@ -225,7 +226,8 @@ module solver
                     tmax = max(tmax,(ctr(i,j)%length(2)*prim(2)+ctr(i,j)%length(1)*prim(3))/ctr(i,j)%area)
                 end do
             end do 
-            !$omp end parallel do
+            !$omp end do
+            !$omp end parallel
 
             !time step
             dt = cfl/tmax
@@ -235,8 +237,85 @@ module solver
         !>calculate the slope of distribution function
         !--------------------------------------------------
         subroutine interpolation()
+            integer :: i,j
+                !$omp parallel
+                !--------------------------------------------------
+                !i direction
+                !--------------------------------------------------
+                !$omp do
+                do j=iymin,iymax
+                    call interp_boundary(ctr(ixmin,j),ctr(ixmin,j),ctr(ixmin+1,j),1)
+                    call interp_boundary(ctr(ixmax,j),ctr(ixmax-1,j),ctr(ixmax,j),1)
+                end do
+                !$omp end do nowait
 
+                !$omp do
+                do j=ixmin,ixmax
+                    do i=ixmin+1,ixmax-1
+                        call interp_inner(ctr(i-1,j),ctr(i,j),ctr(i+1,j),1)
+                    end do
+                end do
+                !$omp end do nowait
+
+                !--------------------------------------------------
+                !j direction
+                !--------------------------------------------------
+                !$omp do
+                do i=ixmin,ixmax
+                    call interp_boundary(ctr(i,iymin),ctr(i,iymin),ctr(i,iymin+1),2)
+                    call interp_boundary(ctr(i,iymax),ctr(i,iymax-1),ctr(i,iymax),2)
+                end do
+                !$omp end do nowait
+
+                !$omp do
+                do j=iymin+1,iymax-1
+                    do i=ixmin,ixmax
+                        call interp_inner(ctr(i,j-1),ctr(i,j),ctr(i,j+1),2)
+                    end do
+                end do
+                !$omp end do nowait
+                !$omp end parallel
         end subroutine interpolation
+
+        !--------------------------------------------------
+        !>one-sided interpolation of the boundary cell
+        !>@param[in] cell_N the target boundary cell
+        !>@param[in] cell_L the left cell
+        !>@param[in] cell_R the right cell
+        !>@param[in] idx  the index indicating i or j direction
+        !--------------------------------------------------
+        subroutine interp_boundary(cell_N,cell_L,cell_R,idx)
+            type(cell_center),intent(in) :: cell_N,cell_L,cell_R
+            integer,intent(in) :: idx
+
+            cell_N%sh(:,:,idx) = (cell_R%h-cell_L%h)/(0.5*cell_R%length(idx)+0.5*cell_L%length(idx))
+            cell_N%sb(:,:,idx) = (cell_R%b-cell_L%b)/(0.5*cell_R%length(idx)+0.5*cell_L%length(idx))
+        end subroutine interp_boundary
+
+        !--------------------------------------------------
+        !>interpolation of the inner cells
+        !>@param[in] cell_L the left cell
+        !>@param[in] cell_N the target cell
+        !>@param[in] cell_R the right cell
+        !>@param[in] idx  the index indicating i or j direction
+        !--------------------------------------------------
+        subroutine interp_inner(cell_L,cell_N,cell_R,idx)
+            type(cell_center),intent(in) :: cell_N,cell_L,cell_R
+            integer,intent(in) :: idx
+            real(kind=8),allocatable,dimension(:,:) :: sL,sR
+
+            !allocate array
+            allocate(sL(unum,vnum))
+            allocate(sR(unum,vnum))
+
+            sL = (cell_N%h-cell_L%h)/(0.5*cell_N%length(idx)+0.5*cell_L%length(idx))
+            sR = (cell_R%h-cell_N%h)/(0.5*cell_R%length(idx)+0.5*cell_N%length(idx))
+            cell_N%sh(:,:,idx) = (sign(UP,sR)+sign(UP,sL))*abs(sR)*abs(sL)/(abs(sR)+abs(sL)+SMV)
+
+            sL = (cell_N%b-cell_L%b)/(0.5*cell_N%length(idx)+0.5*cell_L%length(idx))
+            sR = (cell_R%b-cell_N%b)/(0.5*cell_R%length(idx)+0.5*cell_N%length(idx))
+            cell_N%sb(:,:,idx) = (sign(UP,sR)+sign(UP,sL))*abs(sR)*abs(sL)/(abs(sR)+abs(sL)+SMV)
+        end subroutine interp_inner
 end module solver
 
 !--------------------------------------------------
@@ -262,7 +341,7 @@ module io
             integer :: xnum,ynum !number of cells in x and y direction
 
             !control
-            cfl = 0.8 !cfl number
+            cfl = 0.8 !CFL number
             eps = 1.0E-5 !convergence criteria
             !gas
             ck = 1 !internal degree of freedom
@@ -283,45 +362,11 @@ module io
             bc_S = [1.0, 0.00, 0.0, 1.0] !south
             bc_N = [1.0, 0.15, 0.0, 1.0] !north
 
-            call init_velocity() !initialize discrete velocity space using Gaussian-Hermite quadrature
             call init_geometry(xlength,ylength,xnum,ynum) !initialize the geometry
+            call init_velocity() !initialize discrete velocity space using Gaussian-Hermite quadrature
+            call init_allocation() !allocate arrays
             call init_flow_field(init_gas) !set the initial condition
         end subroutine init
-
-        !--------------------------------------------------
-        !>set discrete velocity space using Gaussian-Hermite quadrature
-        !--------------------------------------------------
-        subroutine init_velocity()
-            real(kind=RKD) :: coords(14), weight(14) !half space velocity points and weight for 28 points (symmetry)
-            integer :: i
-
-            !set velocity points and weight
-            coords = [0.208067382691,0.624836719505,1.043535273750,1.465537263460,1.892360496840,2.325749842660,2.76779535291,3.221112076560,3.689134238460,4.176636742130,4.690756523940,5.243285373200,5.857014641380,6.591605442370]
-            weight = [0.416240109246,0.417513453286,0.420111646094,0.424143944203,0.429791424953,0.437332725764,0.44718947117,0.460008206624,0.476816375219,0.499344597245,0.530774551498,0.577794173639,0.657988990298,0.844760204047]
-
-            !set grid number for u-velocity and v-velocity
-            unum = 28
-            vnum = 28
-
-            !allocate discrete velocity space
-            allocate(uspace(unum)) !x direction
-            allocate(vspace(vnum)) !y direction
-
-            !set grid points and weight for u-velocity
-            do i=unum/2+1,unum
-                uspace(i)%s = coords(i-unum/2)
-                uspace(i)%w = weight(i-unum/1)
-                uspace(unum+1-i)%s = -coords(i-unum/2)
-                uspace(unum+1-i)%w = weight(i-unum/2)
-            end do
-
-            !set grid points and weight for v-velocity (the same)
-            vspace = uspace
-
-            !store the maximum micro velocity
-            umax = maxval(abs(uspace%s))
-            vmax = maxval(abs(vspace%s))
-        end subroutine init_velocity
 
         !--------------------------------------------------
         !>initialize the geometry
@@ -373,6 +418,73 @@ module io
                 hface(i,j)%cosy = 1.0
             end forall
         end subroutine init_geometry
+
+        !--------------------------------------------------
+        !>set discrete velocity space using Gaussian-Hermite quadrature
+        !--------------------------------------------------
+        subroutine init_velocity()
+            real(kind=RKD) :: coords(14), weight(14) !half space velocity points and weight for 28 points (symmetry)
+            integer :: i
+
+            !set velocity points and weight
+            coords = [0.208067382691,0.624836719505,1.043535273750,1.465537263460,1.892360496840,2.325749842660,2.76779535291,3.221112076560,3.689134238460,4.176636742130,4.690756523940,5.243285373200,5.857014641380,6.591605442370]
+            weight = [0.416240109246,0.417513453286,0.420111646094,0.424143944203,0.429791424953,0.437332725764,0.44718947117,0.460008206624,0.476816375219,0.499344597245,0.530774551498,0.577794173639,0.657988990298,0.844760204047]
+
+            !set grid number for u-velocity and v-velocity
+            unum = 28
+            vnum = 28
+
+            !allocate discrete velocity space
+            allocate(uspace(unum)) !x direction
+            allocate(vspace(vnum)) !y direction
+
+            !set grid points and weight for u-velocity
+            do i=unum/2+1,unum
+                uspace(i)%s = coords(i-unum/2)
+                uspace(i)%w = weight(i-unum/1)
+                uspace(unum+1-i)%s = -coords(i-unum/2)
+                uspace(unum+1-i)%w = weight(i-unum/2)
+            end do
+
+            !set grid points and weight for v-velocity (the same)
+            vspace = uspace
+
+            !store the maximum micro velocity
+            umax = maxval(abs(uspace%s))
+            vmax = maxval(abs(vspace%s))
+        end subroutine init_velocity
+
+        !--------------------------------------------------
+        !>allocate arrays
+        !--------------------------------------------------
+        subroutine init_allocation()
+            integer :: i,j
+
+            !cell center
+            do j=iymin,iymax
+                do i=ixmin,ixmax
+                    allocate(ctr(i,j)%h(unum,vnum))
+                    allocate(ctr(i,j)%b(unum,vnum))
+                    allocate(ctr(i,j)%sh(unum,vnum,2))
+                    allocate(ctr(i,j)%sb(unum,vnum,2))
+                end do
+            end do
+
+            !cell interface
+            do j=iymin,iymax
+                do i=ixmin,ixmax+1
+                    allocate(vface(i,j)%flux_h(unum,vnum))
+                    allocate(vface(i,j)%flux_b(unum,vnum))
+                end do
+            end do
+
+            do j=iymin,iymax+1
+                do i=ixmin,ixmax
+                    allocate(hface(i,j)%flux_h(unum,vnum))
+                    allocate(hface(i,j)%flux_b(unum,vnum))
+                end do
+            end do
+        end subroutine init_allocation
 
         !--------------------------------------------------
         !>set the initial condition
