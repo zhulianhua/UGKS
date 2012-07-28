@@ -326,9 +326,11 @@ The flow chart of the numerical procedure is shown in Figure. \ref{pic:flux}
         (wt) edge (at);
         \path[line] node[block,below of=at] (tt) {calculate collision time and some time integration terms}
         (at) edge (tt);
-        \path[line] node[block,below of=tt] (gf) {calculate flux of conservative variables related to $g_0$}
-        (tt) edge (gf);
-        \path[line] node[block,below of=gf] (ff) {calculate the remaining flux}
+        \path[line] node[block,below of=tt] (gg) {calculate flux of conservative variables related to $g_0$}
+        (tt) edge (gg);
+        \path[line] node[block,below of=gg] (gf) {calculate flux of conservative variables related to $g^+$ and $f_0$}
+        (gg) edge (gf);
+        \path[line] node[block,below of=gf] (ff) {calculate flux of distribution functions}
         (gf) edge (ff);
     \end{tikzpicture}
     \caption{interface flux calculation}
@@ -338,10 +340,18 @@ The flow chart of the numerical procedure is shown in Figure. \ref{pic:flux}
 \subsubsection*{Reconstruct initial distribution}
 Take $h$ as example. Since we take value from $h_{i+1/2,k}^L$ only if $u_k\geqslant 0$ and take value from $h_{i+1/2,k}^R$ only if $u_k <0$ (see Eq. \ref{eq:csolution_final}), there is no need to store the left and right values separately. 
 
-In the program, we defined the variable
-$$h_{i+1/2,k} = \begin{cases} h_{i,k}+(x_{i+1/2}-x_i)\sigma_{i,k}^h, & u_k \geqslant 0\\ h_{i+1,k}-(x_{i+1}-x_{i+1/2})\sigma_{i+1,k}^h, & u_k < 0\end{cases}$$
+Instead, we define the variable
+$$h_{i+1/2,k} = \begin{cases} h_{i,k}+(x_{i+1/2}-x_i)\sigma_{i,k}^h, & u_k \geqslant 0\\ h_{i+1,k}-(x_{i+1}-x_{i+1/2})\sigma_{i+1,k}^h, & u_k < 0\end{cases}
+$$
 and similarly
-$$\sigma_{i+1/2,k}^h = \begin{cases} \sigma_{i,k}^h, & u_k \geqslant 0\\ \sigma_{i+1,k}^h, & u_k < 0\end{cases}$$
+$$
+\sigma_{i+1/2,k}^h = \begin{cases} \sigma_{i,k}^h, & u_k \geqslant 0\\ \sigma_{i+1,k}^h, & u_k < 0\end{cases}
+$$
+
+In the program, they are written as
+$$h_{i+1/2,k} =\sigma_{i,k}^h H[u_k]+\sigma_{i+1,k}^h(1-H[u_k])$$
+and
+$$\sigma_{i+1/2,k}^h = (h_{i,k}+(x_{i+1/2}-x_i)\sigma_{i,k}^h)H[u_k]+(h_{i+1,k}-(x_{i+1}-x_{i+1/2})\sigma_{i+1,k}^h)(1-H[u_k])$$
 
 \subsubsection*{Calculate $W_0$}
 $W_0$ is calculated from Eq. \ref{eq:conserved_var}, with $h_k=h_{i+1/2,k}, b_k=b_{i+1/2,k}$
@@ -391,7 +401,7 @@ $$
 Theoretically, $\int_{t^n}^{t^{n+1}}\int {\tilde g}_{i+1/2}u\psi d\Xi dt$ can be calculated analytically. But the integration related to $g^+$ is too complex, and will be calculated with numerical integration. Only the terms related to $g_0$ will be integrated analytically here.
 $${\bf W}_{g_0} = Mt_1\rho_0<u\psi>+Mt_2\rho_0\left(<a^Lu^2\psi>_{>0}+<a^Ru^2\psi>_{<0}\right)+Mt_3\rho_0<Au\psi>$$
 
-\subsubsection*{Calculate the remaining flux}
+\subsubsection*{Calculate the flux of conservative variables related to $g^+$ and $f_0$}
 First evaluate $H_k,B_k$ corresponding to $g_0$ by Eq. \ref{eq:reduced_g},
 $$H_k = \rho_0\left(\frac{\lambda_0}{\pi}\right)^{1/2}e^{-\lambda_0(u_k-U_0)^2},\quad B_k = \frac{K}{2\lambda_0}H_k$$
 and then evaluate $H_{k}^+,B_{k}^+$ corresponding to $g^+$ by Eq. \ref{eq:reduced_gp}
@@ -424,6 +434,7 @@ $$
 The flux of conservative variables is
 $${\bf W}_{i+1/2} = \int_{t^n}^{t^{n+1}}\int f_{i+1/2}u\psi d\Xi dt={\bf W}_{g_0}+{\bf W}_{g^+}+{\bf W}_{f_0}$$
 
+\subsubsection*{Calculate the flux of distribution functions}
 The flux of reduced distribution function $h$ is calculated by
 $$
 \begin{aligned}
