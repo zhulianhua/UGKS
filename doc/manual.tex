@@ -501,26 +501,23 @@ where $g_w,\rho_w,\lambda_w,U_w$ are the variables at the wall.
 
 The corresponding reduced Maxwellian distribution at the wall $H_k^w,B_k^w$ is also obtained.
 
+Thirdly, the distribution function at the boundary interface is expressed by (same holds for $b_k$)
+$$h_k = H_k^wH[u_k]+h_k^{in}(1-H[u_k])$$
+
 Finally, the flux across the wall is calculated by
 $$
-{\bf W}_{1/2} = H[u_k]
+{\bf W}_{1/2} = 
 \begin{pmatrix}
-    \sum\alpha_k u_k H_k^{w}\\
-    \sum\alpha_k u_k^2 H_k^{w}\\
-    \sum\alpha_k \frac{1}{2}\left(u_k^3 H_k^{w}+u_k B_k^{w}\right)
-\end{pmatrix} 
-+(1-H[u_k])
-\begin{pmatrix}
-    \sum\alpha_k u_k h_k^{in}\\
-    \sum\alpha_k u_k^2 h_k^{in}\\
-    \sum\alpha_k \frac{1}{2}\left(u_k^3 h_k^{in}+u_k b_k^{in}\right)
+    \sum\alpha_k u_k h_k\\
+    \sum\alpha_k u_k^2 h_k\\
+    \sum\alpha_k \frac{1}{2}\left(u_k^3 h_k+u_k b_k\right)
 \end{pmatrix} 
 $$
 and
 $$
 \begin{aligned}
-    {\bf F}_{1/2,k}^h &= (u_k H_k^{w})H[u_k]+(u_k h_k^{in})(1-H[u_k]) \\
-    {\bf F}_{1/2,k}^b &= (u_k B_k^{w})H[u_k]+(u_k b_k^{in})(1-H[u_k]) \\
+    {\bf F}_{1/2,k}^h &= u_k h_k\\
+    {\bf F}_{1/2,k}^b &= u_k b_k
 \end{aligned} 
 $$
 

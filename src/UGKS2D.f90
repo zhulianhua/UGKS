@@ -46,6 +46,7 @@ module global_data
     real(kind=RKD) :: gam !ratio of specific heat
     real(kind=RKD) :: omega !temperature dependence index
     real(kind=RKD) :: pr !Prandtl number
+    real(kind=RKD) :: mu_ref,lambda_ref !\mu_{ref} and \lambda_{ref}
     integer :: ck !internal degree of freedom
 
     !--------------------------------------------------
@@ -106,11 +107,11 @@ module global_data
     real(kind=RKD) :: bc_W(4),bc_E(4),bc_S(4),bc_N(4) !boundary conditions at west,east,south and north boundary
 
     !--------------------------------------------------
-    !discrete velocity space
+    !discrete velocity space. Inefficient implementation but clear code
     !--------------------------------------------------
     integer :: unum,vnum !number of velocity points for u and v
     real(kind=RKD) :: umax,vmax !maximum micro velocity
-    real(kind=RKD),allocatable,dimension(:) :: uspace,vspace !u and v discrete velocity space
+    real(kind=RKD),allocatable,dimension(:,:) :: uspace,vspace !u and v discrete velocity space
     real(kind=RKD),allocatable,dimension(:,:) :: weight !weight at velocity u_k and v_l
 end module global_data
 
@@ -123,26 +124,23 @@ module tools
     contains
         !--------------------------------------------------
         !>obtain discretized Maxwellian distribution
-        !>@param[in]  prim :primary variables in global frame
-        !>@param[out] h,b  :reduced Maxwellian distribution
+        !>@param[out] h,b   :distribution function
+        !>@param[in] vn,vt :normal and tangential velocity
+        !>@param[in] prim  :primary variables
         !--------------------------------------------------
-        subroutine discrete_maxwell(prim,h,b)
-            real(kind=8),intent(in) :: prim(4)
+        subroutine discrete_maxwell(h,b,vn,vt,prim)
             real(kind=8),dimension(:,:),intent(out) :: h,b
-            real(kind=8) :: temp
-            integer :: i,j
+            real(kind=8),dimension(:,:),intent(in) :: vn,vt
+            real(kind=8),intent(in) :: prim(4)
 
-            temp = prim(1)*(prim(4)/PI)
-            forall(i=1:unum,j=1:vnum)
-                h(i,j) = temp*exp(-prim(4)*((uspace(i)%s-prim(2))**2+(vspace(j)%s-prim(3))**2))
-                b(i,j) = h(i,j)*ck/(2.0*prim(4))
-            end forall
+            h = prim(1)*(prim(4)/PI)*exp(-prim(4)*((vn-prim(2))**2+(vt-prim(3))**2))
+            b = h*ck/(2.0*prim(4))
         end subroutine discrete_maxwell
 
         !--------------------------------------------------
         !>convert primary variables to conservative variables
-        !>@param[in] prim :primary variables
-        !>@return    w    :conservative variables
+        !>@param[in] prim          :primary variables
+        !>@return    get_conserved :conservative variables
         !--------------------------------------------------
         function get_conserved(prim)
             real(kind=RKD),intent(in) :: prim(4)
@@ -155,23 +153,57 @@ module tools
         end function get_conserved
 
         !--------------------------------------------------
-        !>convert macro variables from global frame to local
-        !>@param[in] w_local      :macro variables in local frame
+        !>convert conservative variables to primary variables
+        !>@param[in] w           :conservative variables
+        !>@return    get_primary :conservative variables
+        !--------------------------------------------------
+        function get_primary(w)
+            real(kind=8),intent(in) :: w(4)
+            real(kind=8) :: get_primary(4) !primary variables
+
+            get_primary(1) = w(1)
+            get_primary(2) = w(2)/w(1)
+            get_primary(3) = w(3)/w(1)
+            get_primary(4) = 0.5*w(1)/(gam-1.0)/(w(4)-0.5*(w(2)**2+w(3)**2)/w(1))
+        end function get_primary
+
+        !--------------------------------------------------
+        !>convert macro variables from local frame to global
+        !>@param[in] w            :macro variables in local frame
         !>@param[in] cosx,cosy    :directional cosine
         !>@return    global_frame :macro variables in global frame
         !--------------------------------------------------
-        function global_frame(w_local,cosx,cosy)
-            real(kind=8),intent(in) :: w_local(4)
-            real(kind=8),intent(in) :: cosx,cosy !directional cosine
+        function global_frame(w,cosx,cosy)
+            real(kind=8),intent(in) :: w(4)
+            real(kind=8),intent(in) :: cosx,cosy
             real(kind=8) :: global_frame(4)
 
             !copy values
-            global_frame = w_local
+            global_frame = w
+
+            !obtain vector in global frame
+            global_frame(2) = w(2)*cosx-w(3)*cosy
+            global_frame(3) = w(2)*cosy+w(3)*cosx
+        end function global_frame
+
+        !--------------------------------------------------
+        !>convert macro variables from global frame to local
+        !>@param[in] w            :macro variables in global frame
+        !>@param[in] cosx,cosy    :directional cosine
+        !>@return    local_frame  :macro variables in local frame
+        !--------------------------------------------------
+        function local_frame(w,cosx,cosy)
+            real(kind=8),intent(in) :: w(4)
+            real(kind=8),intent(in) :: cosx,cosy
+            real(kind=RKD) :: local_frame(4)
+
+            !copy values
+            local_frame = w
 
             !obtain vector in local frame
-            global_frame(2) = w_local(2)*cosx-w_local(3)*cosy
-            global_frame(3) = w_local(2)*cosy+w_local(3)*cosx
-        end function global_frame
+            local_frame(2) = w(2)*cosx+w(3)*cosy
+            local_frame(3) = w(3)*cosx-w(2)*cosy
+        end function local_frame
 
         !--------------------------------------------------
         !>obtain ratio of specific heat
@@ -184,6 +216,46 @@ module tools
 
             get_gamma = float(ck+4)/float(ck+2)
         end function get_gamma
+
+        !--------------------------------------------------
+        !>obtain speed of sound
+        !>@param[in] prim    :primary variables
+        !>@return    get_sos :speed of sound
+        !--------------------------------------------------
+        function get_sos(prim)
+            real(kind=8),intent(in) :: prim(4)
+            real(kind=8) :: get_sos !speed of sound
+
+            get_sos = sqrt(0.5*gam/prim(4))
+        end function get_sos
+        
+        !--------------------------------------------------
+        !>calculate collision time
+        !>@param[in] prim    :primary variables
+        !>return     get_tau :collision time
+        !--------------------------------------------------
+        function get_tau(prim)
+            real(kind=RKD),intent(in) :: prim(4)
+            real(kind=RKD) :: get_tau
+
+            get_tau = mu_ref*lambda_ref**omega*2*prim(4)**(1-omega)/prim(1)
+        end function get_tau
+
+        !--------------------------------------------------
+        !>get heat flux
+        !>@param[in] h,b   :distribution function
+        !>@param[in] vn,vt :normal and tangential velocity
+        !>@param[in] prim  :primary variables
+        !--------------------------------------------------
+        function get_heat_flux(h,b,vn,vt,prim)
+            real(kind=8),dimension(:,:),intent(in) :: h,b
+            real(kind=8),dimension(:,:),intent(in) :: vn,vt
+            real(kind=8),intent(in) :: prim(4)
+            real(kind=8) :: get_heat_flux(2) !heat flux in normal and tangential direction
+
+            get_heat_flux(1) = 0.5*(sum(weight*(vn-prim(2))*((vn-prim(2))**2+(vt-prim(3))**2)*h)+sum(weight*(vn-prim(2))*b)) 
+            get_heat_flux(2) = 0.5*(sum(weight*(vt-prim(3))*((vn-prim(2))**2+(vt-prim(3))**2)*h)+sum(weight*(vt-prim(3))*b)) 
+        end function get_heat_flux
 end module tools
 
 !--------------------------------------------------
@@ -192,6 +264,7 @@ end module tools
 module solver
     use global_data
     use tools
+    use flux
     implicit none
     contains
         !--------------------------------------------------
@@ -211,7 +284,7 @@ module solver
             do j=iymin,iymax
                 do i=ixmin,ixmax
                     !convert conservative variables to primary variables
-                    call convert_w_prim(ctr(i,j)%w,prim)
+                    prim = get_primary(ctr(i,j)%w)
 
                     !sound speed
                     sos = get_sos(prim)
@@ -277,13 +350,14 @@ module solver
 
         !--------------------------------------------------
         !>one-sided interpolation of the boundary cell
-        !>@param[in] cell_N :the target boundary cell
-        !>@param[in] cell_L :the left cell
-        !>@param[in] cell_R :the right cell
-        !>@param[in] idx    :the index indicating i or j direction
+        !>@param[out] cell_N :the target boundary cell
+        !>@param[in]  cell_L :the left cell
+        !>@param[in]  cell_R :the right cell
+        !>@param[in]  idx    :the index indicating i or j direction
         !--------------------------------------------------
         subroutine interp_boundary(cell_N,cell_L,cell_R,idx)
-            type(cell_center),intent(in) :: cell_N,cell_L,cell_R
+            type(cell_center),intent(out) :: cell_N
+            type(cell_center),intent(in) :: cell_L,cell_R
             integer,intent(in) :: idx
 
             cell_N%sh(:,:,idx) = (cell_R%h-cell_L%h)/(0.5*cell_R%length(idx)+0.5*cell_L%length(idx))
@@ -292,13 +366,14 @@ module solver
 
         !--------------------------------------------------
         !>interpolation of the inner cells
-        !>@param[in] cell_L :the left cell
-        !>@param[in] cell_N :the target cell
-        !>@param[in] cell_R :the right cell
-        !>@param[in] idx    :the index indicating i or j direction
+        !>@param[in]    cell_L :the left cell
+        !>@param[inout] cell_N :the target cell
+        !>@param[in]    cell_R :the right cell
+        !>@param[in]    idx    :the index indicating i or j direction
         !--------------------------------------------------
         subroutine interp_inner(cell_L,cell_N,cell_R,idx)
-            type(cell_center),intent(in) :: cell_N,cell_L,cell_R
+            type(cell_center),intent(in) :: cell_L,cell_R
+            type(cell_center),intent(inout) :: cell_N
             integer,intent(in) :: idx
             real(kind=8),allocatable,dimension(:,:) :: sL,sR
 
@@ -363,6 +438,10 @@ module flux
     use global_data
     use tools
     implicit none
+
+    integer,parameter :: MNUM = 6 !number of normal velocity moments
+    integer,parameter :: MTUM = 4 !number of tangential velocity moments
+
     contains
         !--------------------------------------------------
         !>calculate flux of inner interface
@@ -377,9 +456,19 @@ module flux
             integer,intent(in) :: idx
             real(kind=RKD),allocatable,dimension(:,:) :: vn,vt !normal and tangential micro velocity
             real(kind=RKD),allocatable,dimension(:,:) :: h,b !distribution function at the interface
+            real(kind=RKD),allocatable,dimension(:,:) :: H0,B0 !Maxwellian distribution function
+            real(kind=RKD),allocatable,dimension(:,:) :: H_plus,B_plus !Shakhov part of the equilibrium distribution
             real(kind=RKD),allocatable,dimension(:,:) :: sh,sb !slope of distribution function at the interface
             integer,allocatable,dimension(:,:) :: delta !Heaviside step function
             real(kind=RKD) :: w(4),prim(4) !conservative and primary variables at the interface
+            real(kind=RKD) :: qf(2) !heat flux in normal and tangential direction
+            real(kind=RKD) :: sw(4) !slope of W
+            real(kind=RKD) :: aL(4),aR(4),aT(4) !micro slope of Maxwellian distribution, left,right and time.
+            real(kind=RKD) :: Mu(0:MNUM),Mu_L(0:MNUM),Mu_R(0:MNUM),Mv(0:MTUM),Mxi(0:2) !<u^n>,<u^n>_{>0},<u^n>_{<0},<v^m>,<\xi^l>
+            real(kind=RKD) :: Mau_0(4),Mau_L(4),Mau_R(4),Mau_T(4) !<u\psi>,<aL*u^n*\psi>,<aR*u^n*\psi>,<A*u*\psi>
+            real(kind=RKD) :: tau !collision time
+            real(kind=RKD) :: Mt(5) !some time integration terms
+            integer :: i,j
 
             !--------------------------------------------------
             !prepare
@@ -392,12 +481,14 @@ module flux
             allocate(b(unum,vnum))
             allocate(sh(unum,vnum))
             allocate(sb(unum,vnum))
+            allocate(H0(unum,vnum))
+            allocate(B0(unum,vnum))
+            allocate(H_plus(unum,vnum))
+            allocate(B_plus(unum,vnum))
 
             !convert the micro velocity to local frame
-            forall(i=1:unum,j=1:vnum)
-                vn(i,j) = uspace(i)*face%cosx+vspace(j)*face%cosy
-                vt(i,j) = vspace(j)*face%cosx-uspace(i)*face%cosy
-            end forall
+            vn = uspace*face%cosx+vspace*face%cosy
+            vt = vspace*face%cosx-uspace*face%cosy
 
             !Heaviside step function
             delta = (vn+abs(vn)+1)/(2*abs(vn)+1)
@@ -430,26 +521,23 @@ module flux
             !--------------------------------------------------
             !calculate a^L,a^R
             !--------------------------------------------------
-            sw_L = (w-local_frame(cell_L%w))/(0.5*cell_L%length(idx)) !left slope of W
-            sw_R = (local_frame(cell_R%w)-w)/(0.5*cell_R%length(idx)) !right slope of W
-            
-            aL = micro_slope(prim,sw_L) !calculate a^L
-            aR = micro_slope(prim,sw_R) !calculate a^R
+            sw = (w-local_frame(cell_L%w,face%cosx,face%cosy))/(0.5*cell_L%length(idx)) !left slope of W
+            aL = micro_slope(prim,sw) !calculate a^L
+
+            sw = (local_frame(cell_R%w,face%cosx,face%cosy)-w)/(0.5*cell_R%length(idx)) !right slope of W
+            aR = micro_slope(prim,sw) !calculate a^R
 
             !--------------------------------------------------
             !calculate time slope of W and A
             !--------------------------------------------------
-            !<u^n>,<v^m>,<\xi^2> and <\xi^4>, <u^n>_{>0},<u^n>_{<0}
+            !<u^n>,<v^m>,<\xi^l>,<u^n>_{>0},<u^n>_{<0}
             call calc_moment_u(prim,Mu,Mv,Mxi,Mu_L,Mu_R) 
 
-            Mau_L = moment_au(aL,Mu_L,Mv,Mxi,1,0) !<aL*u*\phi>_{>0}
-            Mau_R = moment_au(aR,Mu_R,Mv,Mxi,1,0) !<aR*u*\phi>_{<0}
+            Mau_L = moment_au(aL,Mu_L,Mv,Mxi,1,0) !<aL*u*\psi>_{>0}
+            Mau_R = moment_au(aR,Mu_R,Mv,Mxi,1,0) !<aR*u*\psi>_{<0}
 
-            !time slope of W
-            sw_T = -prim(1)*(Mau_L+Mau_R) 
-
-            !calculate A   
-            aT = micro_slope(prim,sw_T) 
+            sw = -prim(1)*(Mau_L+Mau_R) !time slope of W
+            aT = micro_slope(prim,sw) !calculate A
 
             !--------------------------------------------------
             !calculate collision time and some time integration terms
@@ -465,10 +553,10 @@ module flux
             !--------------------------------------------------
             !calculate the flux of conservative variables related to g0
             !--------------------------------------------------
-            Mau_0 = moment_uv(Mu,Mv,Mxi,1,0) !<u*\phi>
-            Mau_L = moment_au(aL,Mu_L,Mv,Mxi,2,0) !<aL*u^2*\phi>_{>0}
-            Mau_R = moment_au(aR,Mu_R,Mv,Mxi,2,0) !<aR*u^2*\phi>_{<0}
-            Mau_T = moment_au(aT,Mu,Mv,Mxi,1,0) !<A*u*\phi>
+            Mau_0 = moment_uv(Mu,Mv,Mxi,1,0,0) !<u*\psi>
+            Mau_L = moment_au(aL,Mu_L,Mv,Mxi,2,0) !<aL*u^2*\psi>_{>0}
+            Mau_R = moment_au(aR,Mu_R,Mv,Mxi,2,0) !<aR*u^2*\psi>_{<0}
+            Mau_T = moment_au(aT,Mu,Mv,Mxi,1,0) !<A*u*\psi>
 
             face%flux = Mt(1)*prim(1)*Mau_0+Mt(2)*prim(1)*(Mau_L+Mau_R)+Mt(3)*prim(1)*Mau_T
 
@@ -476,7 +564,7 @@ module flux
             !calculate the flux of conservative variables related to g+ and f0
             !--------------------------------------------------
             !Maxwellian distribution H0 and B0
-            call discrete_maxwell(prim,H0,B0,face%cosx,face%cosy) 
+            call discrete_maxwell(H0,B0,vn,vt,prim)
 
             !Shakhov part H+ and B+
             H_plus = 0.8*(1-pr)*prim(4)**2/prim(1)*&
@@ -518,6 +606,190 @@ module flux
             face%flux_h = face%length*face%flux_h
             face%flux_b = face%length*face%flux_b
         end subroutine calc_flux
+        
+        !--------------------------------------------------
+        !>calculate flux of boundary interface, assuming left wall
+        !>@param[in]    bc   :boundary condition
+        !>@param[inout] face :the boundary interface
+        !>@param[in]    cell :cell next to the boundary interface
+        !>@param[in]    idx  :index indicating i or j direction
+        !>@param[in]    rot  :indicating rotation
+        !--------------------------------------------------
+        subroutine calc_flux_boundary(bc,face,cell,idx,rot) 
+            real(kind=RKD),intent(in) :: bc(4)
+            type(cell_interface),intent(inout) :: face
+            type(cell_center),intent(in) :: cell
+            integer,intent(in) :: idx,rot
+            real(kind=RKD),allocatable,dimension(:,:) :: vn,vt !normal and tangential micro velocity
+            real(kind=RKD),allocatable,dimension(:,:) :: h,b !distribution function
+            real(kind=RKD),allocatable,dimension(:,:) :: H0,B0 !Maxwellian distribution function at the wall
+            integer,allocatable,dimension(:,:) :: delta !Heaviside step function
+            real(kind=RKD) :: prim(4) !boundary condition in local frame
+            real(kind=RKD) :: SF,SG
+
+            !--------------------------------------------------
+            !prepare
+            !--------------------------------------------------
+            !allocate array
+            allocate(vn(unum,vnum))
+            allocate(vt(unum,vnum))
+            allocate(delta(unum,vnum))
+            allocate(h(unum,vnum))
+            allocate(b(unum,vnum))
+            allocate(H0(unum,vnum))
+            allocate(B0(unum,vnum))
+
+            !convert the micro velocity to local frame
+            vn = uspace*face%cosx+vspace*face%cosy
+            vt = vspace*face%cosx-uspace*face%cosy
+
+            !Heaviside step function. The rotation accounts for the right wall
+            delta = (vn*rot+abs(vn)+1)/(2*abs(vn)+1)
+
+            !boundary condition in local frame
+            prim = local_frame(bc,face%cosx,face%cosy)
+
+            !--------------------------------------------------
+            !obtain h^{in} and b^{in}, rotation accounts for the right wall
+            !--------------------------------------------------
+            h = cell%h-rot*0.5*cell%length(idx)*cell%sh(:,:,idx)
+            b = cell%b-rot*0.5*cell%length(idx)*cell%sb(:,:,idx)
+
+            !--------------------------------------------------
+            !calculate wall density and Maxwellian distribution
+            !--------------------------------------------------
+            SF = sum(weight*vn*h*(1-delta))
+            SG = (prim(4)/PI)**0.5*sum(weight*vn*exp(-prim(4)*((vn-prim(2))**2+(vt-prim(3))**2))*delta)
+
+            prim(1) = -SF/SG
+
+            call discrete_maxwell(H0,B0,vn,vt,prim)
+
+            !--------------------------------------------------
+            !distribution function at the boundary interface
+            !--------------------------------------------------
+            h = H0*delta+h*(1-delta)
+            b = B0*delta+b*(1-delta)
+
+            !--------------------------------------------------
+            !calculate flux
+            !--------------------------------------------------
+            face%flux(1) = sum(weight*vn*h)
+            face%flux(2) = sum(weight*vn*vn*h)
+            face%flux(3) = sum(weight*vn*vt*h)
+            face%flux(4) = 0.5*sum(weight*vn*((vn**2+vt**2)*h+b))
+
+            face%flux_h = vn*h
+            face%flux_b = vn*b
+
+            !--------------------------------------------------
+            !final flux
+            !--------------------------------------------------
+            !convert to global frame
+            face%flux = global_frame(face%flux,face%cosx,face%cosy) 
+            !total flux
+            face%flux = face%length*face%flux
+            face%flux_h = face%length*face%flux_h
+            face%flux_b = face%length*face%flux_b
+        end subroutine calc_flux_boundary
+
+        !--------------------------------------------------
+        !>calculate micro slope of Maxwellian distribution
+        !>@param[in] prim        :primary variables
+        !>@param[in] sw          :slope of W
+        !>@return    micro_slope :slope of Maxwellian distribution
+        !--------------------------------------------------
+        function micro_slope(prim,sw)
+            real(kind=8),intent(in) :: prim(4),sw(4)
+            real(kind=8) :: micro_slope(4)
+
+            micro_slope(4) = 4.0*prim(4)**2/(ck+2)/prim(1)*(2.0*sw(4)-2.0*prim(2)*sw(2)-2.0*prim(3)*sw(3)+sw(1)*(prim(2)**2+prim(3)**2-0.5*(ck+2)/prim(4)))
+
+            micro_slope(3) = 2.0*prim(4)/prim(1)*(sw(3)-prim(3)*sw(1))-prim(3)*micro_slope(4)
+            micro_slope(2) = 2.0*prim(4)/prim(1)*(sw(2)-prim(2)*sw(1))-prim(2)*micro_slope(4)
+            micro_slope(1) = sw(1)/prim(1)-prim(2)*micro_slope(2)-prim(3)*micro_slope(3)-0.5*(prim(2)**2+prim(3)**2+0.5*(ck+2)/prim(4))*micro_slope(4)
+        end function micro_slope
+
+        !--------------------------------------------------
+        !>calculate moments of velocity
+        !>@param[in] prim :primary variables
+        !>@param[out] Mu,Mv     :<u^n>,<v^m>
+        !>@param[out] Mxi       :<\xi^l>
+        !>@param[out] Mu_L,Mu_R :<u^n>_{>0},<u^n>_{<0}
+        !--------------------------------------------------
+        subroutine calc_moment_u(prim,Mu,Mv,Mxi,Mu_L,Mu_R)
+            real(kind=8),intent(in) :: prim(4)
+            real(kind=8),intent(out) :: Mu(0:MNUM),Mu_L(0:MNUM),Mu_R(0:MNUM)
+            real(kind=8),intent(out) :: Mv(0:MTUM)
+            real(kind=8),intent(out) :: Mxi(0:2)
+            integer :: i
+
+            !moments of normal velocity
+            Mu_L(0) = 0.5*erfc(-sqrt(prim(4))*prim(2))
+            Mu_L(1) = prim(2)*Mu_L(0)+0.5*exp(-prim(4)*prim(2)**2)/sqrt(PI*prim(4))
+            Mu_R(0) = 0.5*erfc(sqrt(prim(4))*prim(2))
+            Mu_R(1) = prim(2)*Mu_R(0)-0.5*exp(-prim(4)*prim(2)**2)/sqrt(PI*prim(4))
+
+            do i=2,MNUM
+                Mu_L(i) = prim(2)*Mu_L(i-1)+0.5*(i-1)*Mu_L(i-2)/prim(4)
+                Mu_R(i) = prim(2)*Mu_R(i-1)+0.5*(i-1)*Mu_R(i-2)/prim(4)
+            end do
+
+            Mu = Mu_L+Mu_R
+
+            !moments of tangential velocity
+            Mv(0) = 1.0
+            Mv(1) = prim(3)
+
+            do i=2,MTUM
+                Mv(i) = prim(3)*Mv(i-1)+0.5*(i-1)*Mv(i-2)/prim(4)
+            end do
+
+            !moments of \xi
+            Mxi(0) = 1.0 !<\xi^0>
+            Mxi(1) = 0.5*ck/prim(4) !<\xi^2>
+            Mxi(2) = (ck**2+2.0*ck)/(4.0*prim(4)**2) !<\xi^4>
+        end subroutine calc_moment_u
+
+        !--------------------------------------------------
+        !>calculate <u^\alpha*v^\beta*\xi^\delta*\psi>
+        !>@param[in] Mu,Mv      :<u^\alpha>,<v^\beta>
+        !>@param[in] Mxi        :<\xi^l>
+        !>@param[in] alpha,beta :exponential index of u and v
+        !>@param[in] delta      :exponential index of \xi
+        !--------------------------------------------------
+        function moment_uv(Mu,Mv,Mxi,alpha,beta,delta)
+            real(kind=8),intent(in) :: Mu(0:MNUM),Mv(0:MTUM),Mxi(0:2)
+            integer,intent(in) :: alpha,beta 
+            integer,intent(in) :: delta
+            real(kind=8) :: moment_uv(4)
+
+            moment_uv(1) = Mu(alpha)*Mv(beta)*Mxi(delta/2)
+            moment_uv(2) = Mu(alpha+1)*Mv(beta)*Mxi(delta/2)
+            moment_uv(3) = Mu(alpha)*Mv(beta+1)*Mxi(delta/2)
+            moment_uv(4) = 0.5*(Mu(alpha+2)*Mv(beta)*Mxi(delta/2)+Mu(alpha)*Mv(beta+2)*Mxi(delta/2)+Mu(alpha)*Mv(beta)*Mxi((delta+2)/2))
+        end function moment_uv
+
+        !--------------------------------------------------
+        !>calculate <a*u^\alpha*v^\beta*\psi>
+        !>@param[in] a          :micro slope of Maxwellian
+        !>@param[in] Mu,Mv      :<u^\alpha>,<v^\beta>
+        !>@param[in] Mxi        :<\xi^l>
+        !>@param[in] alpha,beta :exponential index of u and v
+        !--------------------------------------------------
+        function moment_au(a,Mu,Mv,Mxi,alpha,beta)
+            real(kind=8),intent(in) :: a(4)
+            real(kind=8),intent(in) :: Mu(0:MNUM),Mv(0:MTUM),Mxi(0:2)
+            integer,intent(in) :: alpha,beta
+            real(kind=RKD) :: moment_au(4)
+
+            moment_au = a(1)*moment_uv(Mu,Mv,Mxi,alpha+0,beta+0,0)+&
+                        a(2)*moment_uv(Mu,Mv,Mxi,alpha+1,beta+0,0)+&
+                        a(3)*moment_uv(Mu,Mv,Mxi,alpha+0,beta+1,0)+&
+                        0.5*a(4)*moment_uv(Mu,Mv,Mxi,alpha+2,beta+0,0)+&
+                        0.5*a(4)*moment_uv(Mu,Mv,Mxi,alpha+0,beta+2,0)+&
+                        0.5*a(4)*moment_uv(Mu,Mv,Mxi,alpha+0,beta+0,2)
+        end function moment_au
 end module flux
 
 !--------------------------------------------------
@@ -619,44 +891,33 @@ module io
         !>set discrete velocity space using Gaussian-Hermite quadrature
         !--------------------------------------------------
         subroutine init_velocity()
-            real(kind=RKD) :: coords(14), weights(14) !half space velocity points and weight for 28 points (symmetry)
-            integer :: i
+            real(kind=RKD) :: vcoords(28), weights(28) !velocity points and weight for 28 points (symmetry)
+            integer :: i,j
 
             !set velocity points and weight
-            coords = [0.208067382691,0.624836719505,1.043535273750,1.465537263460,1.892360496840,2.325749842660,2.76779535291,3.221112076560,3.689134238460,4.176636742130,4.690756523940,5.243285373200,5.857014641380,6.591605442370]
-            weights = [0.416240109246,0.417513453286,0.420111646094,0.424143944203,0.429791424953,0.437332725764,0.44718947117,0.460008206624,0.476816375219,0.499344597245,0.530774551498,0.577794173639,0.657988990298,0.844760204047]
+            vcoords = [-6.59160566329956050,-5.85701465606689450,-5.24328517913818360,-4.69075632095336910,-4.17663669586181640,-3.68913412094116210,-3.22111201286315920,-2.76779532432556150,-2.32574987411499020,-1.89236044883728030,-1.46553730964660640,-1.04353523254394530,-0.62483674287796021,-0.20806738734245300,+0.20806738734245300,+0.62483674287796021,+1.04353523254394530,+1.46553730964660640,+1.89236044883728030,+2.32574987411499020,+2.76779532432556150,+3.22111201286315920,+3.68913412094116210,+4.17663669586181640,+4.69075632095336910,+5.24328517913818360,+5.85701465606689450,+6.59160566329956050]
+
+            weights = [-0.84476017951965332,-0.65798896551132202,-0.57779419422149658,-0.53077453374862671,-0.49934458732604980,-0.47681638598442078,-0.46000820398330688,-0.44718948006629944,-0.43733271956443787,-0.42979142069816589,-0.42414394021034241,-0.42011165618896484,-0.41751345992088318,-0.41624009609222412,+0.41624009609222412,+0.41751345992088318,+0.42011165618896484,+0.42414394021034241,+0.42979142069816589,+0.43733271956443787,+0.44718948006629944,+0.46000820398330688,+0.47681638598442078,+0.49934458732604980,+0.53077453374862671,+0.57779419422149658,+0.65798896551132202,+0.84476017951965332]
 
             !set grid number for u-velocity and v-velocity
             unum = 28
             vnum = 28
 
             !allocate discrete velocity space
-            allocate(uspace(unum)) !x direction
-            allocate(vspace(vnum)) !y direction
+            allocate(uspace(unum,vnum)) !x direction
+            allocate(vspace(unum,vnum)) !y direction
             allocate(weight(unum,vnum)) !weight at u_k and v_l
 
-            !set initial value
-            weight = 1.0
-
-            !set grid points and weight for u-velocity
-            do i=unum/2+1,unum
-                uspace(i) = coords(i-unum/2)
-                uspace(unum+1-i) = -coords(i-unum/2)
-                weight(i,:) = weight(i,:)*weights(i-unum/2)
-                weight(unum+1-i,:) = weight(unum+1-i,:)*weights(i-unum/2)
-            end do
-
-            !set grid points and weight for v-velocity (the same)
-            do i=vnum/2+1,vnum
-                vspace(i) = coords(i-vnum/2)
-                vspace(vnum+1-i) = -coords(i-vnum/2)
-                weight(:,i) = weight(:,i)*weights(i-vnum/2)
-                weight(:,vnum+1-i,:) = weight(:,vnum+1-i)*weights(i-vnum/2)
-            end do
+            !set velocity space and weight
+            forall(i=1:unum,j=1:vnum)
+                uspace(i,j) = vcoords(i)
+                vspace(i,j) = vcoords(j)
+                weight(i,j) = weights(i)*weights(j)
+            end forall
 
             !store the maximum micro velocity
-            umax = maxval(abs(uspace))
-            vmax = maxval(abs(vspace))
+            umax = maxval(abs(uspace(:,1)))
+            vmax = maxval(abs(vspace(1,:)))
         end subroutine init_velocity
 
         !--------------------------------------------------
@@ -706,10 +967,10 @@ module io
             allocate(B(unum,vnum))
 
             !convert primary variables to conservative variables
-            call convert_prim_w(init_gas,w)
+            w = get_conserved(init_gas)
 
             !obtain discretized Maxwellian distribution H and B
-            call discrete_maxwell(init_gas,H,B)
+            call discrete_maxwell(H,B,uspace,vspace,init_gas)
 
             !initial condition
             forall(i=ixmin:ixmax,j=iymin:iymax)
@@ -727,6 +988,7 @@ program main
     use global_data
     use tools
     use solver
+    use flux
     use io
     implicit none
 
