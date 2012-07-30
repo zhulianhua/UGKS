@@ -37,16 +37,17 @@ module global_data
     real(kind=RKD) :: res(4) !residual
     real(kind=RKD) :: eps !convergence criteria
     real(kind=RKD) :: sim_time !current simulation time
+    character(len=255),parameter :: HSTFILENAME = "cavity.hst" !history file name
+    character(len=255),parameter :: RSTFILENAME = "cavity.rst" !result file name
     integer :: iter !iteration
 
     !--------------------------------------------------
     !gas properties
     !--------------------------------------------------
-    real(kind=RKD) :: kn !Knudsen number
     real(kind=RKD) :: gam !ratio of specific heat
-    real(kind=RKD) :: omega !temperature dependence index
+    real(kind=RKD) :: omega !temperature dependence index in HS/VHS/VSS model
     real(kind=RKD) :: pr !Prandtl number
-    real(kind=RKD) :: mu_ref,lambda_ref !\mu_{ref} and \lambda_{ref}
+    real(kind=RKD) :: mu_ref !viscosity coefficient in reference state
     integer :: ck !internal degree of freedom
 
     !--------------------------------------------------
@@ -58,6 +59,9 @@ module global_data
     !rotation
     integer,parameter :: RN = 1 !no frame rotation
     integer,parameter :: RY = -1 !with frame rotation
+    !I/O
+    integer,parameter :: HSTFILE = 20 !history file ID
+    integer,parameter :: RSTFILE = 21 !result file ID
 
     !--------------------------------------------------
     !basic derived type
@@ -198,12 +202,10 @@ module tools
             real(kind=RKD),intent(in) :: cosx,cosy
             real(kind=RKD) :: global_frame(4)
 
-            !copy values
-            global_frame = w
-
-            !obtain vector in global frame
+            global_frame(1) = w(1)
             global_frame(2) = w(2)*cosx-w(3)*cosy
             global_frame(3) = w(2)*cosy+w(3)*cosx
+            global_frame(4) = w(4)
         end function global_frame
 
         !--------------------------------------------------
@@ -217,12 +219,10 @@ module tools
             real(kind=RKD),intent(in) :: cosx,cosy
             real(kind=RKD) :: local_frame(4)
 
-            !copy values
-            local_frame = w
-
-            !obtain vector in local frame
+            local_frame(1) = w(1)
             local_frame(2) = w(2)*cosx+w(3)*cosy
             local_frame(3) = w(3)*cosx-w(2)*cosy
+            local_frame(4) = w(4)
         end function local_frame
 
         !--------------------------------------------------
@@ -258,7 +258,7 @@ module tools
             real(kind=RKD),intent(in) :: prim(4)
             real(kind=RKD) :: get_tau
 
-            get_tau = mu_ref*lambda_ref**omega*2*prim(4)**(1-omega)/prim(1)
+            get_tau = mu_ref*2*prim(4)**(1-omega)/prim(1)
         end function get_tau
 
         !--------------------------------------------------
@@ -276,262 +276,35 @@ module tools
             get_heat_flux(1) = 0.5*(sum(weight*(vn-prim(2))*((vn-prim(2))**2+(vt-prim(3))**2)*h)+sum(weight*(vn-prim(2))*b)) 
             get_heat_flux(2) = 0.5*(sum(weight*(vt-prim(3))*((vn-prim(2))**2+(vt-prim(3))**2)*h)+sum(weight*(vt-prim(3))*b)) 
         end function get_heat_flux
+
+        !--------------------------------------------------
+        !>get pressure
+        !>@param[in] h,b   :distribution function
+        !>@param[in] vn,vt :normal and tangential velocity
+        !>@param[in] prim  :primary variables
+        !--------------------------------------------------
+        function get_pressure(h,b,vn,vt,prim)
+            real(kind=RKD),dimension(:,:),intent(in) :: h,b
+            real(kind=RKD),dimension(:,:),intent(in) :: vn,vt
+            real(kind=RKD),intent(in) :: prim(4)
+            real(kind=RKD) :: get_pressure !pressure
+
+            get_pressure = 2.0*(sum(weight*((vn-prim(2))**2+(vt-prim(3))**2)*h)+sum(weight*b))/(ck+1)
+        end function get_pressure
+
+        !--------------------------------------------------
+        !>get the nondimensionalized viscosity coefficient
+        !>@param[in] kn          :Knudsen number
+        !>@param[in] alpha,omega :index related to HS/VHS/VSS model
+        !>@return    get_mu      :nondimensionalized viscosity coefficient
+        !--------------------------------------------------
+        function get_mu(kn,alpha,omega)
+            real(kind=RKD),intent(in) :: kn,alpha,omega
+            real(kind=RKD) :: get_mu
+
+            get_mu = 5*(alpha+1)*(alpha+2)*sqrt(PI)/(4*alpha*(5-2*omega)*(7-2*omega))*kn
+        end function get_mu
 end module tools
-
-!--------------------------------------------------
-!>UGKS solver
-!--------------------------------------------------
-module solver
-    use global_data
-    use tools
-    use flux
-    implicit none
-    contains
-        !--------------------------------------------------
-        !>calculate time step
-        !--------------------------------------------------
-        subroutine timestep()
-            real(kind=RKD) :: tmax !max 1/dt allowed
-            real(kind=RKD) :: sos !speed of sound
-            real(kind=RKD) :: prim(4) !primary variables
-            integer :: i,j
-
-            !set initial value
-            tmax = 0.0
-
-            !$omp parallel 
-            !$omp do private(i,j,sos,prim) reduction(max:tmax)
-            do j=iymin,iymax
-                do i=ixmin,ixmax
-                    !convert conservative variables to primary variables
-                    prim = get_primary(ctr(i,j)%w)
-
-                    !sound speed
-                    sos = get_sos(prim)
-
-                    !maximum velocity
-                    prim(2) = max(umax,abs(prim(2)))+sos
-                    prim(3) = max(vmax,abs(prim(3)))+sos
-
-                    !maximum 1/dt allowed
-                    tmax = max(tmax,(ctr(i,j)%length(2)*prim(2)+ctr(i,j)%length(1)*prim(3))/ctr(i,j)%area)
-                end do
-            end do 
-            !$omp end do
-            !$omp end parallel
-
-            !time step
-            dt = cfl/tmax
-        end subroutine timestep
-
-        !--------------------------------------------------
-        !>calculate the slope of distribution function
-        !--------------------------------------------------
-        subroutine interpolation()
-            integer :: i,j
-                !$omp parallel
-                !--------------------------------------------------
-                !i direction
-                !--------------------------------------------------
-                !$omp do
-                do j=iymin,iymax
-                    call interp_boundary(ctr(ixmin,j),ctr(ixmin,j),ctr(ixmin+1,j),IDIRC) !the last argument indicating it's i direction
-                    call interp_boundary(ctr(ixmax,j),ctr(ixmax-1,j),ctr(ixmax,j),IDIRC)
-                end do
-                !$omp end do nowait
-
-                !$omp do
-                do j=ixmin,ixmax
-                    do i=ixmin+1,ixmax-1
-                        call interp_inner(ctr(i-1,j),ctr(i,j),ctr(i+1,j),IDIRC)
-                    end do
-                end do
-                !$omp end do nowait
-
-                !--------------------------------------------------
-                !j direction
-                !--------------------------------------------------
-                !$omp do
-                do i=ixmin,ixmax
-                    call interp_boundary(ctr(i,iymin),ctr(i,iymin),ctr(i,iymin+1),JDIRC)
-                    call interp_boundary(ctr(i,iymax),ctr(i,iymax-1),ctr(i,iymax),JDIRC)
-                end do
-                !$omp end do nowait
-
-                !$omp do
-                do j=iymin+1,iymax-1
-                    do i=ixmin,ixmax
-                        call interp_inner(ctr(i,j-1),ctr(i,j),ctr(i,j+1),JDIRC)
-                    end do
-                end do
-                !$omp end do nowait
-                !$omp end parallel
-        end subroutine interpolation
-
-        !--------------------------------------------------
-        !>update cell averaged values
-        !--------------------------------------------------
-        subroutine update()
-            real(kind=RKD),allocatable,dimension(:,:) :: H_old,B_old !equilibrium distribution at t=t^n
-            real(kind=RKD),allocatable,dimension(:,:) :: H,B !equilibrium distribution at t=t^{n+1}
-            real(kind=RKD),allocatable,dimension(:,:) :: H_plus,B_plus !Shakhov part
-            real(kind=RKD) :: w_old(4) !conservative variables at t^n
-            real(kind=RKD) :: prim_old(4),prim(4) !primary variables at t^n and t^{n+1}
-            real(kind=RKD) :: tau_old,tau !collision time and t^n and t^{n+1}
-            real(kind=RKD) :: sum_res(4),sum_avg(4)
-            real(kind=RKD) :: qf(2)
-            integer :: i,j
-
-            !allocate arrays
-            allocate(H_old(unum,vnum))
-            allocate(B_old(unum,vnum))
-            allocate(H(unum,vnum))
-            allocate(B(unum,vnum))
-            allocate(H_plus(unum,vnum))
-            allocate(B_plus(unum,vnum))
-
-            !set initial value
-            res = 0.0
-            sum_res = 0.0
-            sum_avg = 0.0
-
-            do j=iymin,iymax
-                do i=ixmin,ixmax
-                    !--------------------------------------------------
-                    !store W^n and calculate H^n,B^n,\tau^n
-                    !--------------------------------------------------
-                    w_old = ctr(i,j)%w !store W^n
-                    
-                    prim_old = get_primary(w_old) !convert to primary variables
-                    call discrete_maxwell(H_old,B_old,uspace,vspace,prim_old) !calculate Maxwellian
-                    tau_old = get_tau(prim_old) !calculate collision time \tau^n
-
-                    !--------------------------------------------------
-                    !update W^{n+1} and calculate H^{n+1},B^{n+1},\tau^{n+1}
-                    !--------------------------------------------------
-                    ctr(i,j)%w = ctr(i,j)%w+(vface(i,j)%flux-vface(i+1,j)%flux+hface(i,j)%flux-hface(i,j+1)%flux)/ctr(i,j)%area !update W^{n+1}
-
-                    prim = get_primary(ctr(i,j)%w)
-                    call discrete_maxwell(H,B,uspace,vspace,prim)
-                    tau = get_tau(prim)
-
-                    !--------------------------------------------------
-                    !record residual
-                    !--------------------------------------------------
-                    sum_res = sum_res+(w_old-ctr(i,j)%w)**2
-                    sum_avg = sum_avg+abs(ctr(i,j)%w)
-
-                    !--------------------------------------------------
-                    !Shakhov part
-                    !--------------------------------------------------
-                    !heat flux at t=t^n
-                    qf = get_heat_flux(ctr(i,j)%h,ctr(i,j)%b,uspace,vspace,prim_old) 
-
-                    !h^+ = H+H^+ at t=t^n
-                    call shakhov_part(H_old,B_old,uspace,vspace,qf,prim_old,H_plus,B_plus) !H^+ and B^+
-                    H_old = H_old+H_plus !h^+
-                    B_old = B_old+B_plus !b^+
-
-                    !h^+ = H+H^+ at t=t^{n+1}
-                    call shakhov_part(H,B,uspace,vspace,qf,prim,H_plus,B_plus)
-                    H = H+H_plus
-                    B = B+B_plus
-
-                    !--------------------------------------------------
-                    !update distribution function
-                    !--------------------------------------------------
-                    ctr(i,j)%h = (ctr(i,j)%h+(vface(i,j)%flux_h-vface(i+1,j)%flux_h+hface(i,j)%flux_h-hface(i,j+1)%flux_h)/ctr(i,j)%area+&
-                                        0.5*dt*(H/tau+(H_old-ctr(i,j)%h)/tau_old))/(1.0+0.5*dt/tau)
-                    ctr(i,j)%b = (ctr(i,j)%b+(vface(i,j)%flux_b-vface(i+1,j)%flux_b+hface(i,j)%flux_b-hface(i,j+1)%flux_b)/ctr(i,j)%area+&
-                                        0.5*dt*(B/tau+(B_old-ctr(i,j)%b)/tau_old))/(1.0+0.5*dt/tau)
-                end do
-            end do
-
-            !final residual
-            res = sqrt(ngrid*sum_res)/(sum_avg+SMV)
-        end subroutine update
-
-        !--------------------------------------------------
-        !>one-sided interpolation of the boundary cell
-        !>@param[out] cell_N :the target boundary cell
-        !>@param[in]  cell_L :the left cell
-        !>@param[in]  cell_R :the right cell
-        !>@param[in]  idx    :the index indicating i or j direction
-        !--------------------------------------------------
-        subroutine interp_boundary(cell_N,cell_L,cell_R,idx)
-            type(cell_center),intent(out) :: cell_N
-            type(cell_center),intent(in) :: cell_L,cell_R
-            integer,intent(in) :: idx
-
-            cell_N%sh(:,:,idx) = (cell_R%h-cell_L%h)/(0.5*cell_R%length(idx)+0.5*cell_L%length(idx))
-            cell_N%sb(:,:,idx) = (cell_R%b-cell_L%b)/(0.5*cell_R%length(idx)+0.5*cell_L%length(idx))
-        end subroutine interp_boundary
-
-        !--------------------------------------------------
-        !>interpolation of the inner cells
-        !>@param[in]    cell_L :the left cell
-        !>@param[inout] cell_N :the target cell
-        !>@param[in]    cell_R :the right cell
-        !>@param[in]    idx    :the index indicating i or j direction
-        !--------------------------------------------------
-        subroutine interp_inner(cell_L,cell_N,cell_R,idx)
-            type(cell_center),intent(in) :: cell_L,cell_R
-            type(cell_center),intent(inout) :: cell_N
-            integer,intent(in) :: idx
-            real(kind=RKD),allocatable,dimension(:,:) :: sL,sR
-
-            !allocate array
-            allocate(sL(unum,vnum))
-            allocate(sR(unum,vnum))
-
-            sL = (cell_N%h-cell_L%h)/(0.5*cell_N%length(idx)+0.5*cell_L%length(idx))
-            sR = (cell_R%h-cell_N%h)/(0.5*cell_R%length(idx)+0.5*cell_N%length(idx))
-            cell_N%sh(:,:,idx) = (sign(UP,sR)+sign(UP,sL))*abs(sR)*abs(sL)/(abs(sR)+abs(sL)+SMV)
-
-            sL = (cell_N%b-cell_L%b)/(0.5*cell_N%length(idx)+0.5*cell_L%length(idx))
-            sR = (cell_R%b-cell_N%b)/(0.5*cell_R%length(idx)+0.5*cell_N%length(idx))
-            cell_N%sb(:,:,idx) = (sign(UP,sR)+sign(UP,sL))*abs(sR)*abs(sL)/(abs(sR)+abs(sL)+SMV)
-        end subroutine interp_inner
-
-        !--------------------------------------------------
-        !>calculate the flux across the interfaces
-        !--------------------------------------------------
-        subroutine evolution()
-            integer :: i,j
-
-            !$omp parallel
-            !$omp do
-            do j=iymin,iymax
-                call calc_flux_boundary(bc_W,vface(ixmin,j),ctr(ixmin,j),IDIRC,RN) !RN means no frame rotation
-                call calc_flux_boundary(bc_E,vface(ixmax+1,j),ctr(ixmax,j),IDIRC,RY) !RY means with frame rotation
-            end do
-            !$omp end do nowait
-
-            !$omp do
-            do j=iymin,iymax
-                do i=ixmin+1,ixmax
-                    call calc_flux(ctr(i-1,j),vface(i,j),ctr(i,j),IDIRC)
-                end do
-            end do
-            !$omp end do nowait
-
-            !$omp do
-            do i=ixmin,ixmax
-                call calc_flux_boundary(bc_S,hface(i,iymin),ctr(i,iymin),JDIRC,RN)
-                call calc_flux_boundary(bc_N,hface(i,iymax+1),ctr(i,iymax),JDIRC,RY)
-            end do
-            !$omp end do nowait
-
-            !$omp do
-            do j=iymin+1,iymax
-                do i=ixmin,ixmax
-                    call calc_flux(ctr(i,j-1),hface(i,j),ctr(i,j),JDIRC)
-                end do
-            end do
-            !$omp end do nowait
-            !$omp end parallel 
-        end subroutine evolution
-end module solver
 
 !--------------------------------------------------
 !>flux calculation
@@ -892,6 +665,261 @@ module flux
 end module flux
 
 !--------------------------------------------------
+!>UGKS solver
+!--------------------------------------------------
+module solver
+    use global_data
+    use tools
+    use flux
+    implicit none
+    contains
+        !--------------------------------------------------
+        !>calculate time step
+        !--------------------------------------------------
+        subroutine timestep()
+            real(kind=RKD) :: tmax !max 1/dt allowed
+            real(kind=RKD) :: sos !speed of sound
+            real(kind=RKD) :: prim(4) !primary variables
+            integer :: i,j
+
+            !set initial value
+            tmax = 0.0
+
+            !$omp parallel 
+            !$omp do private(i,j,sos,prim) reduction(max:tmax)
+            do j=iymin,iymax
+                do i=ixmin,ixmax
+                    !convert conservative variables to primary variables
+                    prim = get_primary(ctr(i,j)%w)
+
+                    !sound speed
+                    sos = get_sos(prim)
+
+                    !maximum velocity
+                    prim(2) = max(umax,abs(prim(2)))+sos
+                    prim(3) = max(vmax,abs(prim(3)))+sos
+
+                    !maximum 1/dt allowed
+                    tmax = max(tmax,(ctr(i,j)%length(2)*prim(2)+ctr(i,j)%length(1)*prim(3))/ctr(i,j)%area)
+                end do
+            end do 
+            !$omp end do
+            !$omp end parallel
+
+            !time step
+            dt = cfl/tmax
+        end subroutine timestep
+
+        !--------------------------------------------------
+        !>calculate the slope of distribution function
+        !--------------------------------------------------
+        subroutine interpolation()
+            integer :: i,j
+                !$omp parallel
+                !--------------------------------------------------
+                !i direction
+                !--------------------------------------------------
+                !$omp do
+                do j=iymin,iymax
+                    call interp_boundary(ctr(ixmin,j),ctr(ixmin,j),ctr(ixmin+1,j),IDIRC) !the last argument indicating i direction
+                    call interp_boundary(ctr(ixmax,j),ctr(ixmax-1,j),ctr(ixmax,j),IDIRC)
+                end do
+                !$omp end do nowait
+
+                !$omp do
+                do j=iymin,iymax
+                    do i=ixmin+1,ixmax-1
+                        call interp_inner(ctr(i-1,j),ctr(i,j),ctr(i+1,j),IDIRC)
+                    end do
+                end do
+                !$omp end do nowait
+
+                !--------------------------------------------------
+                !j direction
+                !--------------------------------------------------
+                !$omp do
+                do i=ixmin,ixmax
+                    call interp_boundary(ctr(i,iymin),ctr(i,iymin),ctr(i,iymin+1),JDIRC)
+                    call interp_boundary(ctr(i,iymax),ctr(i,iymax-1),ctr(i,iymax),JDIRC)
+                end do
+                !$omp end do nowait
+
+                !$omp do
+                do j=iymin+1,iymax-1
+                    do i=ixmin,ixmax
+                        call interp_inner(ctr(i,j-1),ctr(i,j),ctr(i,j+1),JDIRC)
+                    end do
+                end do
+                !$omp end do nowait
+                !$omp end parallel
+        end subroutine interpolation
+
+        !--------------------------------------------------
+        !>update cell averaged values
+        !--------------------------------------------------
+        subroutine update()
+            real(kind=RKD),allocatable,dimension(:,:) :: H_old,B_old !equilibrium distribution at t=t^n
+            real(kind=RKD),allocatable,dimension(:,:) :: H,B !equilibrium distribution at t=t^{n+1}
+            real(kind=RKD),allocatable,dimension(:,:) :: H_plus,B_plus !Shakhov part
+            real(kind=RKD) :: w_old(4) !conservative variables at t^n
+            real(kind=RKD) :: prim_old(4),prim(4) !primary variables at t^n and t^{n+1}
+            real(kind=RKD) :: tau_old,tau !collision time and t^n and t^{n+1}
+            real(kind=RKD) :: sum_res(4),sum_avg(4)
+            real(kind=RKD) :: qf(2)
+            integer :: i,j
+
+            !allocate arrays
+            allocate(H_old(unum,vnum))
+            allocate(B_old(unum,vnum))
+            allocate(H(unum,vnum))
+            allocate(B(unum,vnum))
+            allocate(H_plus(unum,vnum))
+            allocate(B_plus(unum,vnum))
+
+            !set initial value
+            res = 0.0
+            sum_res = 0.0
+            sum_avg = 0.0
+
+            do j=iymin,iymax
+                do i=ixmin,ixmax
+                    !--------------------------------------------------
+                    !store W^n and calculate H^n,B^n,\tau^n
+                    !--------------------------------------------------
+                    w_old = ctr(i,j)%w !store W^n
+                    
+                    prim_old = get_primary(w_old) !convert to primary variables
+                    call discrete_maxwell(H_old,B_old,uspace,vspace,prim_old) !calculate Maxwellian
+                    tau_old = get_tau(prim_old) !calculate collision time \tau^n
+
+                    !--------------------------------------------------
+                    !update W^{n+1} and calculate H^{n+1},B^{n+1},\tau^{n+1}
+                    !--------------------------------------------------
+                    ctr(i,j)%w = ctr(i,j)%w+(vface(i,j)%flux-vface(i+1,j)%flux+hface(i,j)%flux-hface(i,j+1)%flux)/ctr(i,j)%area !update W^{n+1}
+
+                    prim = get_primary(ctr(i,j)%w)
+                    call discrete_maxwell(H,B,uspace,vspace,prim)
+                    tau = get_tau(prim)
+
+                    !--------------------------------------------------
+                    !record residual
+                    !--------------------------------------------------
+                    sum_res = sum_res+(w_old-ctr(i,j)%w)**2
+                    sum_avg = sum_avg+abs(ctr(i,j)%w)
+
+                    !--------------------------------------------------
+                    !Shakhov part
+                    !--------------------------------------------------
+                    !heat flux at t=t^n
+                    qf = get_heat_flux(ctr(i,j)%h,ctr(i,j)%b,uspace,vspace,prim_old) 
+
+                    !h^+ = H+H^+ at t=t^n
+                    call shakhov_part(H_old,B_old,uspace,vspace,qf,prim_old,H_plus,B_plus) !H^+ and B^+
+                    H_old = H_old+H_plus !h^+
+                    B_old = B_old+B_plus !b^+
+
+                    !h^+ = H+H^+ at t=t^{n+1}
+                    call shakhov_part(H,B,uspace,vspace,qf,prim,H_plus,B_plus)
+                    H = H+H_plus
+                    B = B+B_plus
+
+                    !--------------------------------------------------
+                    !update distribution function
+                    !--------------------------------------------------
+                    ctr(i,j)%h = (ctr(i,j)%h+(vface(i,j)%flux_h-vface(i+1,j)%flux_h+hface(i,j)%flux_h-hface(i,j+1)%flux_h)/ctr(i,j)%area+&
+                                        0.5*dt*(H/tau+(H_old-ctr(i,j)%h)/tau_old))/(1.0+0.5*dt/tau)
+                    ctr(i,j)%b = (ctr(i,j)%b+(vface(i,j)%flux_b-vface(i+1,j)%flux_b+hface(i,j)%flux_b-hface(i,j+1)%flux_b)/ctr(i,j)%area+&
+                                        0.5*dt*(B/tau+(B_old-ctr(i,j)%b)/tau_old))/(1.0+0.5*dt/tau)
+                end do
+            end do
+
+            !final residual
+            res = sqrt(ngrid*sum_res)/(sum_avg+SMV)
+        end subroutine update
+
+        !--------------------------------------------------
+        !>one-sided interpolation of the boundary cell
+        !>@param[inout] cell_N :the target boundary cell
+        !>@param[inout] cell_L :the left cell
+        !>@param[inout] cell_R :the right cell
+        !>@param[in]    idx    :the index indicating i or j direction
+        !--------------------------------------------------
+        subroutine interp_boundary(cell_N,cell_L,cell_R,idx)
+            type(cell_center),intent(inout) :: cell_N
+            type(cell_center),intent(inout) :: cell_L,cell_R
+            integer,intent(in) :: idx
+
+            cell_N%sh(:,:,idx) = (cell_R%h-cell_L%h)/(0.5*cell_R%length(idx)+0.5*cell_L%length(idx))
+            cell_N%sb(:,:,idx) = (cell_R%b-cell_L%b)/(0.5*cell_R%length(idx)+0.5*cell_L%length(idx))
+        end subroutine interp_boundary
+
+        !--------------------------------------------------
+        !>interpolation of the inner cells
+        !>@param[in]    cell_L :the left cell
+        !>@param[inout] cell_N :the target cell
+        !>@param[in]    cell_R :the right cell
+        !>@param[in]    idx    :the index indicating i or j direction
+        !--------------------------------------------------
+        subroutine interp_inner(cell_L,cell_N,cell_R,idx)
+            type(cell_center),intent(in) :: cell_L,cell_R
+            type(cell_center),intent(inout) :: cell_N
+            integer,intent(in) :: idx
+            real(kind=RKD),allocatable,dimension(:,:) :: sL,sR
+
+            !allocate array
+            allocate(sL(unum,vnum))
+            allocate(sR(unum,vnum))
+
+            sL = (cell_N%h-cell_L%h)/(0.5*cell_N%length(idx)+0.5*cell_L%length(idx))
+            sR = (cell_R%h-cell_N%h)/(0.5*cell_R%length(idx)+0.5*cell_N%length(idx))
+            cell_N%sh(:,:,idx) = (sign(UP,sR)+sign(UP,sL))*abs(sR)*abs(sL)/(abs(sR)+abs(sL)+SMV)
+
+            sL = (cell_N%b-cell_L%b)/(0.5*cell_N%length(idx)+0.5*cell_L%length(idx))
+            sR = (cell_R%b-cell_N%b)/(0.5*cell_R%length(idx)+0.5*cell_N%length(idx))
+            cell_N%sb(:,:,idx) = (sign(UP,sR)+sign(UP,sL))*abs(sR)*abs(sL)/(abs(sR)+abs(sL)+SMV)
+        end subroutine interp_inner
+
+        !--------------------------------------------------
+        !>calculate the flux across the interfaces
+        !--------------------------------------------------
+        subroutine evolution()
+            integer :: i,j
+
+            !$omp parallel
+            !$omp do
+            do j=iymin,iymax
+                call calc_flux_boundary(bc_W,vface(ixmin,j),ctr(ixmin,j),IDIRC,RN) !RN means no frame rotation
+                call calc_flux_boundary(bc_E,vface(ixmax+1,j),ctr(ixmax,j),IDIRC,RY) !RY means with frame rotation
+            end do
+            !$omp end do nowait
+
+            !$omp do
+            do j=iymin,iymax
+                do i=ixmin+1,ixmax
+                    call calc_flux(ctr(i-1,j),vface(i,j),ctr(i,j),IDIRC)
+                end do
+            end do
+            !$omp end do nowait
+
+            !$omp do
+            do i=ixmin,ixmax
+                call calc_flux_boundary(bc_S,hface(i,iymin),ctr(i,iymin),JDIRC,RN)
+                call calc_flux_boundary(bc_N,hface(i,iymax+1),ctr(i,iymax),JDIRC,RY)
+            end do
+            !$omp end do nowait
+
+            !$omp do
+            do j=iymin+1,iymax
+                do i=ixmin,ixmax
+                    call calc_flux(ctr(i,j-1),hface(i,j),ctr(i,j),JDIRC)
+                end do
+            end do
+            !$omp end do nowait
+            !$omp end parallel 
+        end subroutine evolution
+end module solver
+
+!--------------------------------------------------
 !>input and output
 !--------------------------------------------------
 module io
@@ -904,30 +932,40 @@ module io
         !--------------------------------------------------
         subroutine init()
             real(kind=RKD) :: init_gas(4) !initial condition
+            real(kind=RKD) :: alpha !another index in molecule model
+            real(kind=RKD) :: kn !Knudsen number in reference state
             real(kind=RKD) :: xlength,ylength !length of computational domain in x and y direction
             integer :: xnum,ynum !number of cells in x and y direction
 
             !control
             cfl = 0.8 !CFL number
             eps = 1.0E-5 !convergence criteria
+
             !gas
             ck = 1 !internal degree of freedom
-            kn = 1.0 !Knudsen number
-            omega = 0.81 !temperature dependence index in HS/VHS model
-            pr = 2.0/3.0 !Prandtl number
             gam = get_gamma(ck) !ratio of specific heat
+            pr = 2.0/3.0 !Prandtl number
+            omega = 0.81 !temperature dependence index in VHS model
+
+            !reference viscosity coefficient
+            alpha = 1.0 !another index in VHS model
+            kn = 1.0 !Knudsen number in reference state
+            mu_ref = get_mu(kn,alpha,omega) !reference viscosity coefficient
+
             !geometry
             xlength = 1.0
             ylength = 1.0
             xnum = 61
             ynum = 61
+
             !initial condition (density,u-velocity,v-velocity,lambda=1/temperature)
             init_gas = [1.0, 0.0, 0.0, 1.0]
+
             !set boundary condition (density,u-velocity,v-velocity,lambda)
-            bc_W = [1.0, 0.00, 0.0, 1.0] !west
-            bc_E = [1.0, 0.00, 0.0, 1.0] !east
-            bc_S = [1.0, 0.00, 0.0, 1.0] !south
-            bc_N = [1.0, 0.15, 0.0, 1.0] !north
+            bc_W = [1.0, 0.0, 0.0, 1.0] !west
+            bc_E = [1.0, 0.0, 0.0, 1.0] !east
+            bc_S = [1.0, 0.0, 0.0, 1.0] !south
+            bc_N = [1.0, 50.0/sqrt(2.0*208.0*273.0), 0.0, 1.0] !north
 
             call init_geometry(xlength,ylength,xnum,ynum) !initialize the geometry
             call init_velocity() !initialize discrete velocity space using Gaussian-Hermite quadrature
@@ -1090,6 +1128,37 @@ module io
                 ctr(i,j)%b = B
             end forall
         end subroutine init_flow_field
+
+        !--------------------------------------------------
+        !>write result
+        !--------------------------------------------------
+        subroutine output()
+            real(kind=RKD) :: prim(4) !primary variables
+            real(kind=RKD) :: pressure,temperature,qf(2) !pressure,temperature,heat flux
+            integer :: i,j
+
+            !open result file
+            open(unit=RSTFILE,file=RSTFILENAME,status="replace",action="write")
+
+            !write header
+            write(RSTFILE,*) "VARIABLES = X, Y, RHO, U, V, T, P, QX, QY"
+            write(RSTFILE,*) "ZONE  I = ",ixmax-ixmin+1,", J = ",iymax-iymin+1
+
+            !write solution
+            do j=iymin,iymax
+                do i=ixmin,ixmax
+                    prim = get_primary(ctr(i,j)%w)
+                    pressure = get_pressure(ctr(i,j)%h,ctr(i,j)%b,uspace,vspace,prim)
+                    temperature = 2.0*pressure/prim(1)
+                    qf = get_heat_flux(ctr(i,j)%h,ctr(i,j)%b,uspace,vspace,prim)
+
+                    write(RSTFILE,*) ctr(i,j)%x,ctr(i,j)%y,prim(1),prim(2),prim(3),temperature,pressure,qf(1),qf(2)
+                end do
+            end do
+    
+            !close file
+            close(RSTFILE)
+        end subroutine output
 end module io
 
 !--------------------------------------------------
@@ -1110,6 +1179,10 @@ program main
     iter = 1 !number of iteration
     sim_time = 0.0 !simulation time
 
+    !open file and write header
+    open(unit=HSTFILE,file=HSTFILENAME,status="replace",action="write") !open history file
+    write(HSTFILE,*) "VARIABLES = iter, sim_time, dt, res_rho, res_ru, res_rv, res_re" !write header
+
     !iteration
     do while(.true.)
         call timestep() !calculate time step
@@ -1124,11 +1197,18 @@ program main
         if (mod(iter,10)==0) then
             write(*,"(A18,I15,2E15.7)") "iter,sim_time,dt:",iter,sim_time,dt
             write(*,"(A18,4E15.7)") "res:",res
+            write(HSTFILE,"(I15,6E15.7)") iter,sim_time,dt,res
         end if
 
         iter = iter+1
         sim_time = sim_time+dt
     end do
+
+    !close history file
+    close(HSTFILE)
+
+    !output solution
+    call output()
 end program main
 
 ! vim: set ft=fortran tw=0: 
