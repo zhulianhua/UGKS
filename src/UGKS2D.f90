@@ -289,7 +289,7 @@ module tools
             real(kind=RKD),intent(in) :: prim(4)
             real(kind=RKD) :: get_pressure !pressure
 
-            get_pressure = 2.0*(sum(weight*((vn-prim(2))**2+(vt-prim(3))**2)*h)+sum(weight*b))/(ck+1)
+            get_pressure = (sum(weight*((vn-prim(2))**2+(vt-prim(3))**2)*h)+sum(weight*b))/(ck+2)
         end function get_pressure
 
         !--------------------------------------------------
@@ -950,7 +950,8 @@ module io
             !reference viscosity coefficient
             alpha = 1.0 !another index in VHS model
             kn = 1.0 !Knudsen number in reference state
-            mu_ref = get_mu(kn,alpha,omega) !reference viscosity coefficient
+            !mu_ref = get_mu(kn,alpha,omega) !reference viscosity coefficient
+            mu_ref = get_mu(kn,real(1.0,RKD),real(0.5,RKD)) !reference viscosity coefficient
 
             !geometry
             xlength = 1.0
@@ -965,7 +966,7 @@ module io
             bc_W = [1.0, 0.0, 0.0, 1.0] !west
             bc_E = [1.0, 0.0, 0.0, 1.0] !east
             bc_S = [1.0, 0.0, 0.0, 1.0] !south
-            bc_N = [1.0, 50.0/sqrt(2.0*208.0*273.0), 0.0, 1.0] !north
+            bc_N = [1.0, 0.15, 0.0, 1.0] !north
 
             call init_geometry(xlength,ylength,xnum,ynum) !initialize the geometry
             call init_velocity() !initialize discrete velocity space using Gaussian-Hermite quadrature

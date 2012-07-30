@@ -503,7 +503,7 @@ $$h_k = H_k^wH[u_k]+h_k^{in}(1-H[u_k])$$
 
 Finally, the flux across the wall is calculated by
 $$
-{\bf W}_{1/2} = 
+{\bf W}_{1/2} = \Delta t
 \begin{pmatrix}
     \sum\alpha_k u_k h_k\\
     \sum\alpha_k u_k^2 h_k\\
@@ -513,10 +513,52 @@ $$
 and
 $$
 \begin{aligned}
-    {\bf F}_{1/2,k}^h &= u_k h_k\\
-    {\bf F}_{1/2,k}^b &= u_k b_k
+    {\bf F}_{1/2,k}^h &= \Delta t u_k h_k\\
+    {\bf F}_{1/2,k}^b &= \Delta t u_k b_k
 \end{aligned} 
 $$
+
+%usage
+\chapter{Usage}
+\section{Compiling}
+A makefile is provided to compile the program under Linux. If you are using any IDE (e.g. Visual Studio), use the compiling function provided by the IDE.
+
+The makefile can be used to compile the two codes, UGKS1D and UGKS2D, and also this manual. There are several requirements for the makefile to work.
+\begin{itemize}
+    \item Fortran Compiler: either ifort or gfortran, supporting Fortran 2003
+    \item Bash shell
+    \item Latex: only for compilation of the manual. It requires hyperref, parskip, amsmath, amssymb, fullpage and appendix packages, and also bibtex, dvips and ps2pdf.
+\end{itemize}
+
+By default, the make command will compile both UGKS1D and UGKS2D with openmp and ifort. This behavior can be changed by specifying the target and passing parameters.
+
+\begin{enumerate}
+    \item Compile both UGKS1D and UGKS2D with openmp and ifort\\  make
+    \item Only compile UGKS1D\\ make 1D
+    \item Only compile UGKS2D\\ make 2D
+    \item Compile both UGKS1D and UGKS2D, but \textbf{WITHOUT} openmp, and \textbf{WITH} gfortran\\ make OMP=no FC=gfortran
+    \item Compile the manual\\ make manual
+    \item Clean the compilation\\ make clean
+\end{enumerate}
+
+The executables will be put into the bin directory, and the compiled manual.pdf will in the doc directory.
+
+\section{Running}
+Just type the program name to run it under the bin directory, no input file or data is required. 
+
+The code will generate two files,
+\begin{itemize}
+    \item *.hst : record the convergence history every 10 iterations.
+    \item *.rst : record the final result of the program.
+\end{itemize}
+Both files are in tecplot format.
+
+\section{Other information}
+The comments in the program are written in doxygen format, and can be used to generate documentation of the code. But the doxygen configuration file is not included, and the documentation generation is not tested.
+
+This program uses \href{http://git-scm.com/}{GIT} for version control, and the source repository is published on \href{https://github.com/lainme/UGKS}{GitHub}. To obtain the code via git, use the following command,
+
+git clone https://github.com/lainme/UGKS.git
 
 %UGKS1D code
 \chapter{UGKS1D Code}
