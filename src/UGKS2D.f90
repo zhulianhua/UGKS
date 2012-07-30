@@ -385,7 +385,7 @@ module flux
             w(1) = sum(weight*h)
             w(2) = sum(weight*vn*h)
             w(3) = sum(weight*vt*h)
-            w(4) = 0.5*(sum(weight*vn**2*h)+sum(weight*b))
+            w(4) = 0.5*(sum(weight*(vn**2+vt**2)*h)+sum(weight*b))
 
             !convert to primary variables
             prim = get_primary(w)
@@ -531,7 +531,7 @@ module flux
             !calculate wall density and Maxwellian distribution
             !--------------------------------------------------
             SF = sum(weight*vn*h*(1-delta))
-            SG = (prim(4)/PI)**0.5*sum(weight*vn*exp(-prim(4)*((vn-prim(2))**2+(vt-prim(3))**2))*delta)
+            SG = (prim(4)/PI)*sum(weight*vn*exp(-prim(4)*((vn-prim(2))**2+(vt-prim(3))**2))*delta)
 
             prim(1) = -SF/SG
 
@@ -560,9 +560,9 @@ module flux
             !convert to global frame
             face%flux = global_frame(face%flux,face%cosx,face%cosy) 
             !total flux
-            face%flux = face%length*face%flux
-            face%flux_h = face%length*face%flux_h
-            face%flux_b = face%length*face%flux_b
+            face%flux = dt*face%length*face%flux
+            face%flux_h = dt*face%length*face%flux_h
+            face%flux_b = dt*face%length*face%flux_b
         end subroutine calc_flux_boundary
 
         !--------------------------------------------------
@@ -755,6 +755,45 @@ module solver
         end subroutine interpolation
 
         !--------------------------------------------------
+        !>calculate the flux across the interfaces
+        !--------------------------------------------------
+        subroutine evolution()
+            integer :: i,j
+
+            !$omp parallel
+            !$omp do
+            do j=iymin,iymax
+                call calc_flux_boundary(bc_W,vface(ixmin,j),ctr(ixmin,j),IDIRC,RN) !RN means no frame rotation
+                call calc_flux_boundary(bc_E,vface(ixmax+1,j),ctr(ixmax,j),IDIRC,RY) !RY means with frame rotation
+            end do
+            !$omp end do nowait
+
+            !$omp do
+            do j=iymin,iymax
+                do i=ixmin+1,ixmax
+                    call calc_flux(ctr(i-1,j),vface(i,j),ctr(i,j),IDIRC)
+                end do
+            end do
+            !$omp end do nowait
+
+            !$omp do
+            do i=ixmin,ixmax
+                call calc_flux_boundary(bc_S,hface(i,iymin),ctr(i,iymin),JDIRC,RN)
+                call calc_flux_boundary(bc_N,hface(i,iymax+1),ctr(i,iymax),JDIRC,RY)
+            end do
+            !$omp end do nowait
+
+            !$omp do
+            do j=iymin+1,iymax
+                do i=ixmin,ixmax
+                    call calc_flux(ctr(i,j-1),hface(i,j),ctr(i,j),JDIRC)
+                end do
+            end do
+            !$omp end do nowait
+            !$omp end parallel 
+        end subroutine evolution
+
+        !--------------------------------------------------
         !>update cell averaged values
         !--------------------------------------------------
         subroutine update()
@@ -878,45 +917,6 @@ module solver
             sR = (cell_R%b-cell_N%b)/(0.5*cell_R%length(idx)+0.5*cell_N%length(idx))
             cell_N%sb(:,:,idx) = (sign(UP,sR)+sign(UP,sL))*abs(sR)*abs(sL)/(abs(sR)+abs(sL)+SMV)
         end subroutine interp_inner
-
-        !--------------------------------------------------
-        !>calculate the flux across the interfaces
-        !--------------------------------------------------
-        subroutine evolution()
-            integer :: i,j
-
-            !$omp parallel
-            !$omp do
-            do j=iymin,iymax
-                call calc_flux_boundary(bc_W,vface(ixmin,j),ctr(ixmin,j),IDIRC,RN) !RN means no frame rotation
-                call calc_flux_boundary(bc_E,vface(ixmax+1,j),ctr(ixmax,j),IDIRC,RY) !RY means with frame rotation
-            end do
-            !$omp end do nowait
-
-            !$omp do
-            do j=iymin,iymax
-                do i=ixmin+1,ixmax
-                    call calc_flux(ctr(i-1,j),vface(i,j),ctr(i,j),IDIRC)
-                end do
-            end do
-            !$omp end do nowait
-
-            !$omp do
-            do i=ixmin,ixmax
-                call calc_flux_boundary(bc_S,hface(i,iymin),ctr(i,iymin),JDIRC,RN)
-                call calc_flux_boundary(bc_N,hface(i,iymax+1),ctr(i,iymax),JDIRC,RY)
-            end do
-            !$omp end do nowait
-
-            !$omp do
-            do j=iymin+1,iymax
-                do i=ixmin,ixmax
-                    call calc_flux(ctr(i,j-1),hface(i,j),ctr(i,j),JDIRC)
-                end do
-            end do
-            !$omp end do nowait
-            !$omp end parallel 
-        end subroutine evolution
 end module solver
 
 !--------------------------------------------------
@@ -1040,10 +1040,10 @@ module io
                         +2.76779532432556150,+3.22111201286315920,+3.68913412094116210,+4.17663669586181640,&
                         +4.69075632095336910,+5.24328517913818360,+5.85701465606689450,+6.59160566329956050]
 
-            weights = [ -0.84476017951965332,-0.65798896551132202,-0.57779419422149658,-0.53077453374862671,&
-                        -0.49934458732604980,-0.47681638598442078,-0.46000820398330688,-0.44718948006629944,&
-                        -0.43733271956443787,-0.42979142069816589,-0.42414394021034241,-0.42011165618896484,&
-                        -0.41751345992088318,-0.41624009609222412,+0.41624009609222412,+0.41751345992088318,&
+            weights = [ +0.84476017951965332,+0.65798896551132202,+0.57779419422149658,+0.53077453374862671,&
+                        +0.49934458732604980,+0.47681638598442078,+0.46000820398330688,+0.44718948006629944,&
+                        +0.43733271956443787,+0.42979142069816589,+0.42414394021034241,+0.42011165618896484,&
+                        +0.41751345992088318,+0.41624009609222412,+0.41624009609222412,+0.41751345992088318,&
                         +0.42011165618896484,+0.42414394021034241,+0.42979142069816589,+0.43733271956443787,&
                         +0.44718948006629944,+0.46000820398330688,+0.47681638598442078,+0.49934458732604980,&
                         +0.53077453374862671,+0.57779419422149658,+0.65798896551132202,+0.84476017951965332]
@@ -1194,11 +1194,11 @@ program main
         if (all(res<eps)) exit
 
         !write iteration situation every 10 iterations
-        if (mod(iter,10)==0) then
+        !if (mod(iter,10)==0) then
             write(*,"(A18,I15,2E15.7)") "iter,sim_time,dt:",iter,sim_time,dt
             write(*,"(A18,4E15.7)") "res:",res
             write(HSTFILE,"(I15,6E15.7)") iter,sim_time,dt,res
-        end if
+        !end if
 
         iter = iter+1
         sim_time = sim_time+dt

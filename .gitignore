@@ -6,3 +6,7 @@ doc/*
 *.vim
 tags
 bin
+*.hst
+*.rst
+*.add
+*.add.spl
