@@ -53,12 +53,11 @@ module global_data
     !macros for a readable code
     !--------------------------------------------------
     !direction
-    integer,parameter :: WEST = 1
-    integer,parameter :: EAST = 2 
-    integer,parameter :: SOUTH = 3
-    integer,parameter :: NORTH = 4
     integer,parameter :: IDIRC = 1 !i direction
     integer,parameter :: JDIRC = 2 !j direction
+    !rotation
+    integer,parameter :: RN = 1 !no frame rotation
+    integer,parameter :: RY = -1 !with frame rotation
 
     !--------------------------------------------------
     !basic derived type
@@ -125,17 +124,38 @@ module tools
         !--------------------------------------------------
         !>obtain discretized Maxwellian distribution
         !>@param[out] h,b   :distribution function
-        !>@param[in] vn,vt :normal and tangential velocity
-        !>@param[in] prim  :primary variables
+        !>@param[in]  vn,vt :normal and tangential velocity
+        !>@param[in]  prim  :primary variables
         !--------------------------------------------------
         subroutine discrete_maxwell(h,b,vn,vt,prim)
-            real(kind=8),dimension(:,:),intent(out) :: h,b
-            real(kind=8),dimension(:,:),intent(in) :: vn,vt
-            real(kind=8),intent(in) :: prim(4)
+            real(kind=RKD),dimension(:,:),intent(out) :: h,b
+            real(kind=RKD),dimension(:,:),intent(in) :: vn,vt
+            real(kind=RKD),intent(in) :: prim(4)
 
             h = prim(1)*(prim(4)/PI)*exp(-prim(4)*((vn-prim(2))**2+(vt-prim(3))**2))
             b = h*ck/(2.0*prim(4))
         end subroutine discrete_maxwell
+
+        !--------------------------------------------------
+        !>calculate the Shakhov part H^+, B^+
+        !>@param[in]  H,B           :Maxwellian distribution function
+        !>@param[in]  vn,vt         :normal and tangential velocity
+        !>@param[in]  qf            :heat flux
+        !>@param[in]  prim          :primary variables
+        !>@param[out] H_plus,B_plus :Shakhov part
+        !--------------------------------------------------
+        subroutine shakhov_part(H,B,vn,vt,qf,prim,H_plus,B_plus)
+            real(kind=RKD),dimension(:,:),intent(in) :: H,B
+            real(kind=RKD),dimension(:,:),intent(in) :: vn,vt
+            real(kind=RKD) :: qf(2)
+            real(kind=RKD) :: prim(4)
+            real(kind=RKD),dimension(:,:),intent(out) :: H_plus,B_plus
+
+            H_plus = 0.8*(1-pr)*prim(4)**2/prim(1)*&
+                     ((vn-prim(2))*qf(1)+(vt-prim(3))*qf(2))*(2*prim(4)*((vn-prim(2))**2+(vt-prim(3))**2)+ck-5)*H
+            B_plus = 0.8*(1-pr)*prim(4)**2/prim(1)*&
+                     ((vn-prim(2))*qf(1)+(vt-prim(3))*qf(2))*(2*prim(4)*((vn-prim(2))**2+(vt-prim(3))**2)+ck-3)*B
+        end subroutine shakhov_part
 
         !--------------------------------------------------
         !>convert primary variables to conservative variables
@@ -158,8 +178,8 @@ module tools
         !>@return    get_primary :conservative variables
         !--------------------------------------------------
         function get_primary(w)
-            real(kind=8),intent(in) :: w(4)
-            real(kind=8) :: get_primary(4) !primary variables
+            real(kind=RKD),intent(in) :: w(4)
+            real(kind=RKD) :: get_primary(4) !primary variables
 
             get_primary(1) = w(1)
             get_primary(2) = w(2)/w(1)
@@ -174,9 +194,9 @@ module tools
         !>@return    global_frame :macro variables in global frame
         !--------------------------------------------------
         function global_frame(w,cosx,cosy)
-            real(kind=8),intent(in) :: w(4)
-            real(kind=8),intent(in) :: cosx,cosy
-            real(kind=8) :: global_frame(4)
+            real(kind=RKD),intent(in) :: w(4)
+            real(kind=RKD),intent(in) :: cosx,cosy
+            real(kind=RKD) :: global_frame(4)
 
             !copy values
             global_frame = w
@@ -193,8 +213,8 @@ module tools
         !>@return    local_frame  :macro variables in local frame
         !--------------------------------------------------
         function local_frame(w,cosx,cosy)
-            real(kind=8),intent(in) :: w(4)
-            real(kind=8),intent(in) :: cosx,cosy
+            real(kind=RKD),intent(in) :: w(4)
+            real(kind=RKD),intent(in) :: cosx,cosy
             real(kind=RKD) :: local_frame(4)
 
             !copy values
@@ -223,8 +243,8 @@ module tools
         !>@return    get_sos :speed of sound
         !--------------------------------------------------
         function get_sos(prim)
-            real(kind=8),intent(in) :: prim(4)
-            real(kind=8) :: get_sos !speed of sound
+            real(kind=RKD),intent(in) :: prim(4)
+            real(kind=RKD) :: get_sos !speed of sound
 
             get_sos = sqrt(0.5*gam/prim(4))
         end function get_sos
@@ -248,10 +268,10 @@ module tools
         !>@param[in] prim  :primary variables
         !--------------------------------------------------
         function get_heat_flux(h,b,vn,vt,prim)
-            real(kind=8),dimension(:,:),intent(in) :: h,b
-            real(kind=8),dimension(:,:),intent(in) :: vn,vt
-            real(kind=8),intent(in) :: prim(4)
-            real(kind=8) :: get_heat_flux(2) !heat flux in normal and tangential direction
+            real(kind=RKD),dimension(:,:),intent(in) :: h,b
+            real(kind=RKD),dimension(:,:),intent(in) :: vn,vt
+            real(kind=RKD),intent(in) :: prim(4)
+            real(kind=RKD) :: get_heat_flux(2) !heat flux in normal and tangential direction
 
             get_heat_flux(1) = 0.5*(sum(weight*(vn-prim(2))*((vn-prim(2))**2+(vt-prim(3))**2)*h)+sum(weight*(vn-prim(2))*b)) 
             get_heat_flux(2) = 0.5*(sum(weight*(vt-prim(3))*((vn-prim(2))**2+(vt-prim(3))**2)*h)+sum(weight*(vt-prim(3))*b)) 
@@ -271,9 +291,9 @@ module solver
         !>calculate time step
         !--------------------------------------------------
         subroutine timestep()
-            real(kind=8) :: tmax !max 1/dt allowed
-            real(kind=8) :: sos !speed of sound
-            real(kind=8) :: prim(4) !primary variables
+            real(kind=RKD) :: tmax !max 1/dt allowed
+            real(kind=RKD) :: sos !speed of sound
+            real(kind=RKD) :: prim(4) !primary variables
             integer :: i,j
 
             !set initial value
@@ -315,15 +335,15 @@ module solver
                 !--------------------------------------------------
                 !$omp do
                 do j=iymin,iymax
-                    call interp_boundary(ctr(ixmin,j),ctr(ixmin,j),ctr(ixmin+1,j),1) !the last argument "1" indicating it's i direction
-                    call interp_boundary(ctr(ixmax,j),ctr(ixmax-1,j),ctr(ixmax,j),1)
+                    call interp_boundary(ctr(ixmin,j),ctr(ixmin,j),ctr(ixmin+1,j),IDIRC) !the last argument indicating it's i direction
+                    call interp_boundary(ctr(ixmax,j),ctr(ixmax-1,j),ctr(ixmax,j),IDIRC)
                 end do
                 !$omp end do nowait
 
                 !$omp do
                 do j=ixmin,ixmax
                     do i=ixmin+1,ixmax-1
-                        call interp_inner(ctr(i-1,j),ctr(i,j),ctr(i+1,j),1)
+                        call interp_inner(ctr(i-1,j),ctr(i,j),ctr(i+1,j),IDIRC)
                     end do
                 end do
                 !$omp end do nowait
@@ -333,20 +353,103 @@ module solver
                 !--------------------------------------------------
                 !$omp do
                 do i=ixmin,ixmax
-                    call interp_boundary(ctr(i,iymin),ctr(i,iymin),ctr(i,iymin+1),2)
-                    call interp_boundary(ctr(i,iymax),ctr(i,iymax-1),ctr(i,iymax),2)
+                    call interp_boundary(ctr(i,iymin),ctr(i,iymin),ctr(i,iymin+1),JDIRC)
+                    call interp_boundary(ctr(i,iymax),ctr(i,iymax-1),ctr(i,iymax),JDIRC)
                 end do
                 !$omp end do nowait
 
                 !$omp do
                 do j=iymin+1,iymax-1
                     do i=ixmin,ixmax
-                        call interp_inner(ctr(i,j-1),ctr(i,j),ctr(i,j+1),2)
+                        call interp_inner(ctr(i,j-1),ctr(i,j),ctr(i,j+1),JDIRC)
                     end do
                 end do
                 !$omp end do nowait
                 !$omp end parallel
         end subroutine interpolation
+
+        !--------------------------------------------------
+        !>update cell averaged values
+        !--------------------------------------------------
+        subroutine update()
+            real(kind=RKD),allocatable,dimension(:,:) :: H_old,B_old !equilibrium distribution at t=t^n
+            real(kind=RKD),allocatable,dimension(:,:) :: H,B !equilibrium distribution at t=t^{n+1}
+            real(kind=RKD),allocatable,dimension(:,:) :: H_plus,B_plus !Shakhov part
+            real(kind=RKD) :: w_old(4) !conservative variables at t^n
+            real(kind=RKD) :: prim_old(4),prim(4) !primary variables at t^n and t^{n+1}
+            real(kind=RKD) :: tau_old,tau !collision time and t^n and t^{n+1}
+            real(kind=RKD) :: sum_res(4),sum_avg(4)
+            real(kind=RKD) :: qf(2)
+            integer :: i,j
+
+            !allocate arrays
+            allocate(H_old(unum,vnum))
+            allocate(B_old(unum,vnum))
+            allocate(H(unum,vnum))
+            allocate(B(unum,vnum))
+            allocate(H_plus(unum,vnum))
+            allocate(B_plus(unum,vnum))
+
+            !set initial value
+            res = 0.0
+            sum_res = 0.0
+            sum_avg = 0.0
+
+            do j=iymin,iymax
+                do i=ixmin,ixmax
+                    !--------------------------------------------------
+                    !store W^n and calculate H^n,B^n,\tau^n
+                    !--------------------------------------------------
+                    w_old = ctr(i,j)%w !store W^n
+                    
+                    prim_old = get_primary(w_old) !convert to primary variables
+                    call discrete_maxwell(H_old,B_old,uspace,vspace,prim_old) !calculate Maxwellian
+                    tau_old = get_tau(prim_old) !calculate collision time \tau^n
+
+                    !--------------------------------------------------
+                    !update W^{n+1} and calculate H^{n+1},B^{n+1},\tau^{n+1}
+                    !--------------------------------------------------
+                    ctr(i,j)%w = ctr(i,j)%w+(vface(i,j)%flux-vface(i+1,j)%flux+hface(i,j)%flux-hface(i,j+1)%flux)/ctr(i,j)%area !update W^{n+1}
+
+                    prim = get_primary(ctr(i,j)%w)
+                    call discrete_maxwell(H,B,uspace,vspace,prim)
+                    tau = get_tau(prim)
+
+                    !--------------------------------------------------
+                    !record residual
+                    !--------------------------------------------------
+                    sum_res = sum_res+(w_old-ctr(i,j)%w)**2
+                    sum_avg = sum_avg+abs(ctr(i,j)%w)
+
+                    !--------------------------------------------------
+                    !Shakhov part
+                    !--------------------------------------------------
+                    !heat flux at t=t^n
+                    qf = get_heat_flux(ctr(i,j)%h,ctr(i,j)%b,uspace,vspace,prim_old) 
+
+                    !h^+ = H+H^+ at t=t^n
+                    call shakhov_part(H_old,B_old,uspace,vspace,qf,prim_old,H_plus,B_plus) !H^+ and B^+
+                    H_old = H_old+H_plus !h^+
+                    B_old = B_old+B_plus !b^+
+
+                    !h^+ = H+H^+ at t=t^{n+1}
+                    call shakhov_part(H,B,uspace,vspace,qf,prim,H_plus,B_plus)
+                    H = H+H_plus
+                    B = B+B_plus
+
+                    !--------------------------------------------------
+                    !update distribution function
+                    !--------------------------------------------------
+                    ctr(i,j)%h = (ctr(i,j)%h+(vface(i,j)%flux_h-vface(i+1,j)%flux_h+hface(i,j)%flux_h-hface(i,j+1)%flux_h)/ctr(i,j)%area+&
+                                        0.5*dt*(H/tau+(H_old-ctr(i,j)%h)/tau_old))/(1.0+0.5*dt/tau)
+                    ctr(i,j)%b = (ctr(i,j)%b+(vface(i,j)%flux_b-vface(i+1,j)%flux_b+hface(i,j)%flux_b-hface(i,j+1)%flux_b)/ctr(i,j)%area+&
+                                        0.5*dt*(B/tau+(B_old-ctr(i,j)%b)/tau_old))/(1.0+0.5*dt/tau)
+                end do
+            end do
+
+            !final residual
+            res = sqrt(ngrid*sum_res)/(sum_avg+SMV)
+        end subroutine update
 
         !--------------------------------------------------
         !>one-sided interpolation of the boundary cell
@@ -375,7 +478,7 @@ module solver
             type(cell_center),intent(in) :: cell_L,cell_R
             type(cell_center),intent(inout) :: cell_N
             integer,intent(in) :: idx
-            real(kind=8),allocatable,dimension(:,:) :: sL,sR
+            real(kind=RKD),allocatable,dimension(:,:) :: sL,sR
 
             !allocate array
             allocate(sL(unum,vnum))
@@ -399,31 +502,30 @@ module solver
             !$omp parallel
             !$omp do
             do j=iymin,iymax
-                !the first "1" indicating i direction, the second "1" indicating the frame rotation
-                call calc_flux_boundary(bc_W,vface(ixmin,j),ctr(ixmin,j),1,1) 
-                call calc_flux_boundary(bc_E,vface(ixmax+1,j),ctr(ixmax,j),1,-1)
+                call calc_flux_boundary(bc_W,vface(ixmin,j),ctr(ixmin,j),IDIRC,RN) !RN means no frame rotation
+                call calc_flux_boundary(bc_E,vface(ixmax+1,j),ctr(ixmax,j),IDIRC,RY) !RY means with frame rotation
             end do
             !$omp end do nowait
 
             !$omp do
             do j=iymin,iymax
                 do i=ixmin+1,ixmax
-                    call calc_flux(ctr(i-1,j),vface(i,j),ctr(i,j),1) !"1" indicating the i direction
+                    call calc_flux(ctr(i-1,j),vface(i,j),ctr(i,j),IDIRC)
                 end do
             end do
             !$omp end do nowait
 
             !$omp do
             do i=ixmin,ixmax
-                call calc_flux_boundary(bc_S,hface(i,iymin),ctr(i,iymin),2,1)
-                call calc_flux_boundary(bc_N,hface(i,iymax+1),ctr(i,iymax),2,-1)
+                call calc_flux_boundary(bc_S,hface(i,iymin),ctr(i,iymin),JDIRC,RN)
+                call calc_flux_boundary(bc_N,hface(i,iymax+1),ctr(i,iymax),JDIRC,RY)
             end do
             !$omp end do nowait
 
             !$omp do
             do j=iymin+1,iymax
                 do i=ixmin,ixmax
-                    call calc_flux(ctr(i,j-1),hface(i,j),ctr(i,j),2)
+                    call calc_flux(ctr(i,j-1),hface(i,j),ctr(i,j),JDIRC)
                 end do
             end do
             !$omp end do nowait
@@ -567,10 +669,7 @@ module flux
             call discrete_maxwell(H0,B0,vn,vt,prim)
 
             !Shakhov part H+ and B+
-            H_plus = 0.8*(1-pr)*prim(4)**2/prim(1)*&
-                     ((vn-prim(2))*qf(1)+(vt-prim(3))*qf(2))*(2*prim(4)*((vn-prim(2))**2+(vt-prim(3))**2)+ck-5)*H0
-            B_plus = 0.8*(1-pr)*prim(4)**2/prim(1)*&
-                     ((vn-prim(2))*qf(1)+(vt-prim(3))*qf(2))*(2*prim(4)*((vn-prim(2))**2+(vt-prim(3))**2)+ck-3)*B0
+            call shakhov_part(H0,B0,vn,vt,qf,prim,H_plus,B_plus)
 
             !macro flux related to g+ and f0
             face%flux(1) = face%flux(1)+Mt(1)*sum(weight*vn*H_plus)+Mt(4)*sum(weight*vn*h)-Mt(5)*sum(weight*vn**2*sh)
@@ -700,8 +799,8 @@ module flux
         !>@return    micro_slope :slope of Maxwellian distribution
         !--------------------------------------------------
         function micro_slope(prim,sw)
-            real(kind=8),intent(in) :: prim(4),sw(4)
-            real(kind=8) :: micro_slope(4)
+            real(kind=RKD),intent(in) :: prim(4),sw(4)
+            real(kind=RKD) :: micro_slope(4)
 
             micro_slope(4) = 4.0*prim(4)**2/(ck+2)/prim(1)*(2.0*sw(4)-2.0*prim(2)*sw(2)-2.0*prim(3)*sw(3)+sw(1)*(prim(2)**2+prim(3)**2-0.5*(ck+2)/prim(4)))
 
@@ -718,10 +817,10 @@ module flux
         !>@param[out] Mu_L,Mu_R :<u^n>_{>0},<u^n>_{<0}
         !--------------------------------------------------
         subroutine calc_moment_u(prim,Mu,Mv,Mxi,Mu_L,Mu_R)
-            real(kind=8),intent(in) :: prim(4)
-            real(kind=8),intent(out) :: Mu(0:MNUM),Mu_L(0:MNUM),Mu_R(0:MNUM)
-            real(kind=8),intent(out) :: Mv(0:MTUM)
-            real(kind=8),intent(out) :: Mxi(0:2)
+            real(kind=RKD),intent(in) :: prim(4)
+            real(kind=RKD),intent(out) :: Mu(0:MNUM),Mu_L(0:MNUM),Mu_R(0:MNUM)
+            real(kind=RKD),intent(out) :: Mv(0:MTUM)
+            real(kind=RKD),intent(out) :: Mxi(0:2)
             integer :: i
 
             !moments of normal velocity
@@ -759,10 +858,10 @@ module flux
         !>@param[in] delta      :exponential index of \xi
         !--------------------------------------------------
         function moment_uv(Mu,Mv,Mxi,alpha,beta,delta)
-            real(kind=8),intent(in) :: Mu(0:MNUM),Mv(0:MTUM),Mxi(0:2)
+            real(kind=RKD),intent(in) :: Mu(0:MNUM),Mv(0:MTUM),Mxi(0:2)
             integer,intent(in) :: alpha,beta 
             integer,intent(in) :: delta
-            real(kind=8) :: moment_uv(4)
+            real(kind=RKD) :: moment_uv(4)
 
             moment_uv(1) = Mu(alpha)*Mv(beta)*Mxi(delta/2)
             moment_uv(2) = Mu(alpha+1)*Mv(beta)*Mxi(delta/2)
@@ -778,8 +877,8 @@ module flux
         !>@param[in] alpha,beta :exponential index of u and v
         !--------------------------------------------------
         function moment_au(a,Mu,Mv,Mxi,alpha,beta)
-            real(kind=8),intent(in) :: a(4)
-            real(kind=8),intent(in) :: Mu(0:MNUM),Mv(0:MTUM),Mxi(0:2)
+            real(kind=RKD),intent(in) :: a(4)
+            real(kind=RKD),intent(in) :: Mu(0:MNUM),Mv(0:MTUM),Mxi(0:2)
             integer,intent(in) :: alpha,beta
             real(kind=RKD) :: moment_au(4)
 
@@ -895,9 +994,21 @@ module io
             integer :: i,j
 
             !set velocity points and weight
-            vcoords = [-6.59160566329956050,-5.85701465606689450,-5.24328517913818360,-4.69075632095336910,-4.17663669586181640,-3.68913412094116210,-3.22111201286315920,-2.76779532432556150,-2.32574987411499020,-1.89236044883728030,-1.46553730964660640,-1.04353523254394530,-0.62483674287796021,-0.20806738734245300,+0.20806738734245300,+0.62483674287796021,+1.04353523254394530,+1.46553730964660640,+1.89236044883728030,+2.32574987411499020,+2.76779532432556150,+3.22111201286315920,+3.68913412094116210,+4.17663669586181640,+4.69075632095336910,+5.24328517913818360,+5.85701465606689450,+6.59160566329956050]
+            vcoords = [ -6.59160566329956050,-5.85701465606689450,-5.24328517913818360,-4.69075632095336910,&
+                        -4.17663669586181640,-3.68913412094116210,-3.22111201286315920,-2.76779532432556150,&
+                        -2.32574987411499020,-1.89236044883728030,-1.46553730964660640,-1.04353523254394530,&
+                        -0.62483674287796021,-0.20806738734245300,+0.20806738734245300,+0.62483674287796021,&
+                        +1.04353523254394530,+1.46553730964660640,+1.89236044883728030,+2.32574987411499020,&
+                        +2.76779532432556150,+3.22111201286315920,+3.68913412094116210,+4.17663669586181640,&
+                        +4.69075632095336910,+5.24328517913818360,+5.85701465606689450,+6.59160566329956050]
 
-            weights = [-0.84476017951965332,-0.65798896551132202,-0.57779419422149658,-0.53077453374862671,-0.49934458732604980,-0.47681638598442078,-0.46000820398330688,-0.44718948006629944,-0.43733271956443787,-0.42979142069816589,-0.42414394021034241,-0.42011165618896484,-0.41751345992088318,-0.41624009609222412,+0.41624009609222412,+0.41751345992088318,+0.42011165618896484,+0.42414394021034241,+0.42979142069816589,+0.43733271956443787,+0.44718948006629944,+0.46000820398330688,+0.47681638598442078,+0.49934458732604980,+0.53077453374862671,+0.57779419422149658,+0.65798896551132202,+0.84476017951965332]
+            weights = [ -0.84476017951965332,-0.65798896551132202,-0.57779419422149658,-0.53077453374862671,&
+                        -0.49934458732604980,-0.47681638598442078,-0.46000820398330688,-0.44718948006629944,&
+                        -0.43733271956443787,-0.42979142069816589,-0.42414394021034241,-0.42011165618896484,&
+                        -0.41751345992088318,-0.41624009609222412,+0.41624009609222412,+0.41751345992088318,&
+                        +0.42011165618896484,+0.42414394021034241,+0.42979142069816589,+0.43733271956443787,&
+                        +0.44718948006629944,+0.46000820398330688,+0.47681638598442078,+0.49934458732604980,&
+                        +0.53077453374862671,+0.57779419422149658,+0.65798896551132202,+0.84476017951965332]
 
             !set grid number for u-velocity and v-velocity
             unum = 28

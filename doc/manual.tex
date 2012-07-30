@@ -465,14 +465,12 @@ The procedure is shown in Figure. \ref{pic:update}
 \begin{figure}[htb!]
     \centering
     \begin{tikzpicture}[thick]
-        \path[line] node[block] (ww) {calculate $W^{n+1}$ by Eq. \ref{eq:conservative_discrete}};
-        \path[line] (ww) ++(0,-1.5) coordinate node[block] (gg) {calculate\\ $H^{n},B^{n},\tau^{n}$ at $t=t^n$ \\ $H^{n+1},B^{n+1},\tau^{n+1}$ at $t=t^{n+1}$}
-        (ww) edge (gg);
-        \path[line] (gg) ++(0,-1.5) coordinate node[block] (qf) {calculate heat flux ${\bf q}$ with $h^n,b^n,W^n$}
-        (gg) edge (qf);
-        \path[line] (qf) ++(0,-1.5) coordinate node[block] (gp) {calculate\\ $h^{+(n)},b^{+(n)}$ with ${\bf q},H^n,B^n,W^n$\\ $h^{+(n+1)},b^{+(n+1)}$ with ${\bf q},H^{n+1},B^{n+1},W^{n+1}$}
-        (qf) edge (gp);
-        \path[line] (gp) ++(0,-1.5) coordinate node[block] (ff) {calculate $h^{n+1}$ and $b^{n+1}$}
+        \path[line] node[block] (wn) {store $W^n$ and calculate $H^n,B^n,\tau^n$};
+        \path[line] node[block,below of=wn] (ww) {calculate $W^{n+1}$ by Eq. \ref{eq:conservative_discrete},and $H^{n+1},B^{n+1},\tau^{n+1}$}
+        (wn) edge (ww);
+        \path[line] (ww) ++(0,-2.0) coordinate node[block] (gp) {calculate\\heat flux ${\bf q}$ with $h^n,b^n,W^n$\\ $h^{+(n)},b^{+(n)}$ with ${\bf q},H^n,B^n,W^n$\\ $h^{+(n+1)},b^{+(n+1)}$ with ${\bf q},H^{n+1},B^{n+1},W^{n+1}$}
+        (ww) edge (gp);
+        \path[line] (gp) ++(0,-2.0) coordinate node[block] (ff) {calculate $h^{n+1}$ and $b^{n+1}$}
         (gp) edge (ff);
     \end{tikzpicture}
     \caption{update cell averaged value}
