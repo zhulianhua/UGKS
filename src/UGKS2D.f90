@@ -950,8 +950,7 @@ module io
             !reference viscosity coefficient
             alpha = 1.0 !another index in VHS model
             kn = 1.0 !Knudsen number in reference state
-            !mu_ref = get_mu(kn,alpha,omega) !reference viscosity coefficient
-            mu_ref = get_mu(kn,real(1.0,RKD),real(0.5,RKD)) !reference viscosity coefficient
+            mu_ref = get_mu(kn,alpha,omega) !reference viscosity coefficient
 
             !geometry
             xlength = 1.0
