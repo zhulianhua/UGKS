@@ -289,7 +289,7 @@ module tools
             real(kind=RKD),intent(in) :: prim(4)
             real(kind=RKD) :: get_pressure !pressure
 
-            get_pressure = 2.0*(sum(weight*((vn-prim(2))**2+(vt-prim(3))**2)*h)+sum(weight*b))/(ck+1)
+            get_pressure = (sum(weight*((vn-prim(2))**2+(vt-prim(3))**2)*h)+sum(weight*b))/(ck+2)
         end function get_pressure
 
         !--------------------------------------------------
@@ -1082,6 +1082,8 @@ module io
                     allocate(ctr(i,j)%b(unum,vnum))
                     allocate(ctr(i,j)%sh(unum,vnum,2))
                     allocate(ctr(i,j)%sb(unum,vnum,2))
+                    ctr(i,j)%sh = 0.0
+                    ctr(i,j)%sb = 0.0
                 end do
             end do
 
@@ -1186,7 +1188,7 @@ program main
     !iteration
     do while(.true.)
         call timestep() !calculate time step
-        call interpolation() !calculate the slope of distribution function
+        !call interpolation() !calculate the slope of distribution function
         call evolution() !calculate flux across the interfaces
         call update() !update cell averaged value
 
