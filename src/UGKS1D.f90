@@ -281,7 +281,7 @@ module flux
             real(kind=RKD) :: qf !heat flux in normal and tangential direction
             real(kind=RKD) :: sw(3) !slope of W
             real(kind=RKD) :: aL(3),aR(3),aT(3) !micro slope of Maxwellian distribution, left,right and time.
-            real(kind=RKD) :: Mu(0:MNUM),Mu_L(0:MNUM),Mu_R(0:MNUM),Mv(0:MTUM),Mxi(0:2) !<u^n>,<u^n>_{>0},<u^n>_{<0},<v^m>,<\xi^l>
+            real(kind=RKD) :: Mu(0:MNUM),Mu_L(0:MNUM),Mu_R(0:MNUM),Mxi(0:2) !<u^n>,<u^n>_{>0},<u^n>_{<0},<v^m>,<\xi^l>
             real(kind=RKD) :: Mau_0(3),Mau_L(3),Mau_R(3),Mau_T(3) !<u\psi>,<aL*u^n*\psi>,<aR*u^n*\psi>,<A*u*\psi>
             real(kind=RKD) :: tau !collision time
             real(kind=RKD) :: Mt(5) !some time integration terms
@@ -315,7 +315,7 @@ module flux
             sb = cell_L%sb*delta+cell_R%sb*(1-delta)
 
             !--------------------------------------------------
-            !obtain macroscopic variables (local frame)
+            !obtain macroscopic variables
             !--------------------------------------------------
             !conservative variables w_0
             w(1) = sum(weight*h)
@@ -408,59 +408,50 @@ module flux
         !>@param[in]    bc   :boundary condition
         !>@param[inout] face :the boundary interface
         !>@param[in]    cell :cell next to the boundary interface
-        !>@param[in]    idx  :index indicating i or j direction
         !>@param[in]    rot  :indicating rotation
         !--------------------------------------------------
-        subroutine calc_flux_boundary(bc,face,cell,idx,rot) 
-            real(kind=RKD),intent(in) :: bc(4)
+        subroutine calc_flux_boundary(bc,face,cell,rot) 
+            real(kind=RKD),intent(in) :: bc(3)
             type(cell_interface),intent(inout) :: face
             type(cell_center),intent(in) :: cell
-            integer,intent(in) :: idx,rot
-            real(kind=RKD),allocatable,dimension(:,:) :: uspace,vt !normal and tangential micro velocity
-            real(kind=RKD),allocatable,dimension(:,:) :: h,b !distribution function
-            real(kind=RKD),allocatable,dimension(:,:) :: H0,B0 !Maxwellian distribution function at the wall
-            integer,allocatable,dimension(:,:) :: delta !Heaviside step function
-            real(kind=RKD) :: prim(4) !boundary condition in local frame
+            integer,intent(in) :: rot
+            real(kind=RKD),allocatable,dimension(:) :: h,b !distribution function
+            real(kind=RKD),allocatable,dimension(:) :: H0,B0 !Maxwellian distribution function at the wall
+            integer,allocatable,dimension(:) :: delta !Heaviside step function
+            real(kind=RKD) :: prim(3) !boundary condition in local frame
             real(kind=RKD) :: SF,SG
-            !FIXME
 
             !--------------------------------------------------
             !prepare
             !--------------------------------------------------
             !allocate array
-            allocate(uspace(unum,uspaceum))
-            allocate(vt(unum,uspaceum))
-            allocate(delta(unum,uspaceum))
-            allocate(h(unum,uspaceum))
-            allocate(b(unum,uspaceum))
-            allocate(H0(unum,uspaceum))
-            allocate(B0(unum,uspaceum))
-
-            !convert the micro velocity to local frame
-            uspace = uspace*face%cosx+vspace*face%cosy
-            vt = vspace*face%cosx-uspace*face%cosy
+            allocate(delta(unum))
+            allocate(h(unum))
+            allocate(b(unum))
+            allocate(H0(unum))
+            allocate(B0(unum))
 
             !Heaviside step function. The rotation accounts for the right wall
             delta = (sign(UP,uspace)*rot+1)/2
 
-            !boundary condition in local frame
-            prim = local_frame(bc,face%cosx,face%cosy)
+            !copy boundary condition
+            prim = bc
 
             !--------------------------------------------------
             !obtain h^{in} and b^{in}, rotation accounts for the right wall
             !--------------------------------------------------
-            h = cell%h-rot*0.5*cell%length(idx)*cell%sh(:,:,idx)
-            b = cell%b-rot*0.5*cell%length(idx)*cell%sb(:,:,idx)
+            h = cell%h-rot*0.5*cell%length*cell%sh
+            b = cell%b-rot*0.5*cell%length*cell%sb
 
             !--------------------------------------------------
             !calculate wall density and Maxwellian distribution
             !--------------------------------------------------
             SF = sum(weight*uspace*h*(1-delta))
-            SG = (prim(4)/PI)*sum(weight*uspace*exp(-prim(4)*((uspace-prim(2))**2+(vt-prim(3))**2))*delta)
+            SG = (prim(3)/PI)**(1.0/2.0)*sum(weight*uspace*exp(-prim(3)*(uspace-prim(2))**2)*delta)
 
             prim(1) = -SF/SG
 
-            call discrete_maxwell(H0,B0,uspace,vt,prim)
+            call discrete_maxwell(H0,B0,prim)
 
             !--------------------------------------------------
             !distribution function at the boundary interface
@@ -473,8 +464,7 @@ module flux
             !--------------------------------------------------
             face%flux(1) = sum(weight*uspace*h)
             face%flux(2) = sum(weight*uspace*uspace*h)
-            face%flux(3) = sum(weight*uspace*vt*h)
-            face%flux(4) = 0.5*sum(weight*uspace*((uspace**2+vt**2)*h+b))
+            face%flux(3) = 0.5*sum(weight*uspace*(uspace**2*h+b))
 
             face%flux_h = uspace*h
             face%flux_b = uspace*b
@@ -482,12 +472,10 @@ module flux
             !--------------------------------------------------
             !final flux
             !--------------------------------------------------
-            !convert to global frame
-            face%flux = global_frame(face%flux,face%cosx,face%cosy) 
             !total flux
-            face%flux = dt*face%length*face%flux
-            face%flux_h = dt*face%length*face%flux_h
-            face%flux_b = dt*face%length*face%flux_b
+            face%flux = dt*face%flux
+            face%flux_h = dt*face%flux_h
+            face%flux_b = dt*face%flux_b
         end subroutine calc_flux_boundary
 
         !--------------------------------------------------
@@ -546,14 +534,14 @@ module flux
         !>@param[in] delta      :exponential index of \xi
         !>@return    moment_uv  :moment of <u^\alpha*\xi^\delta*\psi>
         !--------------------------------------------------
-        function moment_uv(Mu,Mxi,alpha,beta,delta)
-            real(kind=RKD),intent(in) :: Mu(0:MNUM),Mv(0:MTUM),Mxi(0:2)
+        function moment_uv(Mu,Mxi,alpha,delta)
+            real(kind=RKD),intent(in) :: Mu(0:MNUM),Mxi(0:2)
             integer,intent(in) :: alpha,delta
             real(kind=RKD) :: moment_uv(3)
 
             moment_uv(1) = Mu(alpha)*Mxi(delta/2)
             moment_uv(2) = Mu(alpha+1)*Mxi(delta/2)
-            moment_uv(4) = 0.5*(Mu(alpha+2)*Mxi(delta/2)+Mu(alpha)*Mxi((delta+2)/2))
+            moment_uv(3) = 0.5*(Mu(alpha+2)*Mxi(delta/2)+Mu(alpha)*Mxi((delta+2)/2))
         end function moment_uv
 
         !--------------------------------------------------
@@ -629,12 +617,10 @@ module solver
             !no interpolation if first order (already set to zero slope when initializing)
             if (method_interp==FIRST_ORDER) return 
 
-            !$omp parallel
-            !$omp do
             call interp_boundary(ctr(ixmin),ctr(ixmin),ctr(ixmin+1))
             call interp_boundary(ctr(ixmax),ctr(ixmax-1),ctr(ixmax))
-            !$omp end do nowait
 
+            !$omp parallel
             !$omp do
             do i=ixmin+1,ixmax-1
                 call interp_inner(ctr(i-1),ctr(i),ctr(i+1))
@@ -649,12 +635,10 @@ module solver
         subroutine evolution()
             integer :: i
 
-            !$omp parallel
-            !$omp do
             call calc_flux_boundary(bc_W,vface(ixmin),ctr(ixmin),RN) !RN means no frame rotation
             call calc_flux_boundary(bc_E,vface(ixmax+1),ctr(ixmax),RY) !RY means with frame rotation
-            !$omp end do nowait
 
+            !$omp parallel
             !$omp do
             do i=ixmin+1,ixmax
                 call calc_flux(ctr(i-1),vface(i),ctr(i))
@@ -800,10 +784,7 @@ module io
             real(kind=RKD) :: kn !Knudsen number in reference state
             real(kind=RKD) :: xlength !length of computational domain
             real(kind=RKD) :: umin,umax !smallest and largest discrete velocity (for newton-cotes)
-            integer :: unum !number of velocity points (for newton-cotes)
             integer :: xnum !number of cells
-
-            !FIXME
 
             !control
             cfl = 0.8 !CFL number
@@ -828,9 +809,12 @@ module io
             xlength = 1.0
             xnum = 45
 
+            !initial condition (density,u-velocity,lambda=1/temperature)
+            init_gas = [1.0, 0.0, 1.0]
+
             !set boundary condition (density,u-velocity,lambda)
-            bc_W = [1.0, 0.0, 0.0, 1.0] !west
-            bc_E = [1.0, 0.0, 0.0, 1.0] !east
+            bc_W = [1.0, 0.0, 1.0] !west
+            bc_E = [1.0, 0.0, 1.0] !east
 
             call init_geometry(xlength,xnum) !initialize the geometry
             call init_velocity_newton(unum,umin,umax) !initialize discrete velocity space
@@ -856,6 +840,7 @@ module io
             !allocation
             allocate(ctr(ixmin:ixmax)) !cell center
             allocate(vface(ixmin:ixmax+1)) !vertical and horizontal cell interface
+            allocate(geometry(ixmin:ixmax+1)) !x coordinates (nodal value)
 
             !cell length and area
             dx = xlength/(ixmax-ixmin+1)
@@ -865,7 +850,7 @@ module io
             end forall
 
             forall(i=ixmin:ixmax) !cell center
-                ctr(i,j)%length = dx
+                ctr(i)%length = dx
             end forall
         end subroutine init_geometry
 
@@ -904,7 +889,7 @@ module io
                 !>@param[in] num          :total number in velocity space
                 !>@return    newton_coeff :coefficient for newton-cotes formula
                 !--------------------------------------------------
-                function newton_coeff(idx,num)
+                pure function newton_coeff(idx,num)
                     integer,intent(in) :: idx,num
                     real(kind=RKD) :: newton_coeff
 
@@ -946,29 +931,28 @@ module io
         !>@param[in] init_gas :initial condition
         !--------------------------------------------------
         subroutine init_flow_field(init_gas)
-            real(kind=RKD),intent(in) :: init_gas(4)
-            real(kind=RKD),allocatable,dimension(:,:) :: H,B !reduced Maxwellian distribution functions
-            real(kind=RKD) :: w(4) !conservative variables
-            integer :: i,j
-            !FIXME
+            real(kind=RKD),intent(in) :: init_gas(3)
+            real(kind=RKD),allocatable,dimension(:) :: H,B !reduced Maxwellian distribution functions
+            real(kind=RKD) :: w(3) !conservative variables
+            integer :: i
 
             !allocate array
-            allocate(H(unum,uspaceum))
-            allocate(B(unum,uspaceum))
+            allocate(H(unum))
+            allocate(B(unum))
 
             !convert primary variables to conservative variables
             w = get_conserved(init_gas)
 
             !obtain discretized Maxwellian distribution H and B
-            call discrete_maxwell(H,B,uspace,vspace,init_gas)
+            call discrete_maxwell(H,B,init_gas)
 
             !initial condition
-            forall(i=ixmin:ixmax,j=iymin:iymax)
-                ctr(i,j)%w = w
-                ctr(i,j)%h = H
-                ctr(i,j)%b = B
-                ctr(i,j)%sh = 0.0
-                ctr(i,j)%sb = 0.0
+            forall(i=ixmin:ixmax)
+                ctr(i)%w = w
+                ctr(i)%h = H
+                ctr(i)%b = B
+                ctr(i)%sh = 0.0
+                ctr(i)%sb = 0.0
             end forall
         end subroutine init_flow_field
 
@@ -982,10 +966,10 @@ module io
             !prepare solution
             do i=ixmin,ixmax
                 prim = get_primary(ctr(i)%w) !primary variables
-                ctr(i,j)%primary(1:2) = prim(1:2) !density,u
-                ctr(i,j)%primary(3) = get_pressure(ctr(i)%h,ctr(i)%b,prim) !pressure
-                ctr(i,j)%primary(4) = 2.0*ctr(i)%primary(3)/ctr(i)%primary(1) !temperature
-                ctr(i,j)%primary(5) = get_heat_flux(ctr(i)%h,ctr(i)%b,prim) !heat flux
+                ctr(i)%primary(1:2) = prim(1:2) !density,u
+                ctr(i)%primary(3) = get_pressure(ctr(i)%h,ctr(i)%b,prim) !pressure
+                ctr(i)%primary(4) = 2.0*ctr(i)%primary(3)/ctr(i)%primary(1) !temperature
+                ctr(i)%primary(5) = get_heat_flux(ctr(i)%h,ctr(i)%b,prim) !heat flux
             end do
 
             !open result file
@@ -1037,15 +1021,16 @@ program main
         call evolution() !calculate flux across the interfaces
         call update() !update cell averaged value
 
-        !check if exit
-        if (all(res<eps)) exit
-
         !write iteration situation every 10 iterations
-        if (mod(iter,10)==0) then
+        !if (mod(iter,10)==0) then
             write(*,"(A18,I15,2E15.7)") "iter,sim_time,dt:",iter,sim_time,dt
             write(*,"(A18,3E15.7)") "res:",res
             write(HSTFILE,"(I15,5E15.7)") iter,sim_time,dt,res
-        end if
+        !end if
+
+        !check if exit
+        !if (all(res<eps)) exit
+        if (iter==22) exit
 
         iter = iter+1
         sim_time = sim_time+dt
