@@ -1077,7 +1077,7 @@ module io
             !velocity space
             forall(i=1:unum,j=1:vnum)
                 uspace(i,j) = umin+(i-1)*du
-                vpsace(i,j) = vmin+(j-1)*dv
+                vspace(i,j) = vmin+(j-1)*dv
                 weight(i,j) = (newton_coeff(i,unum)*du)*(newton_coeff(j,vnum)*dv)
             end forall
 
@@ -1088,7 +1088,7 @@ module io
                 !>@param[in] num          :total number in velocity space
                 !>@return    newton_coeff :coefficient for newton-cotes formula
                 !--------------------------------------------------
-                function newton_coeff(idx,num)
+                pure function newton_coeff(idx,num)
                     integer,intent(in) :: idx,num
                     real(kind=RKD) :: newton_coeff
 
