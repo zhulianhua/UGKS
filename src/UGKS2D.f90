@@ -37,9 +37,10 @@ module global_data
     real(kind=RKD) :: res(4) !residual
     real(kind=RKD) :: eps !convergence criteria
     real(kind=RKD) :: sim_time !current simulation time
-    character(len=255),parameter :: HSTFILENAME = "cavity.hst" !history file name
+    character(len=255),parameter :: HSTFILENAME = "cavity.hst" !convergence history file name
     character(len=255),parameter :: RSTFILENAME = "cavity.rst" !result file name
     integer :: iter !iteration
+    integer :: method_interp !interpolation method
 
     !--------------------------------------------------
     !gas properties
@@ -62,6 +63,9 @@ module global_data
     !I/O
     integer,parameter :: HSTFILE = 20 !history file ID
     integer,parameter :: RSTFILE = 21 !result file ID
+    !interpolation
+    integer,parameter :: FIRST_ORDER = 0 !first order interpolation
+    integer,parameter :: SECOND_ORDER = 1 !second order interpolation
 
     !--------------------------------------------------
     !basic derived type
@@ -69,11 +73,11 @@ module global_data
     !cell center
     type :: cell_center
         !geometry
-        real(kind=RKD) :: x,y !x and y coordinates of cell center
         real(kind=RKD) :: area !cell area
         real(kind=RKD) :: length(2) !length in i and j direction
         !flow field
         real(kind=RKD) :: w(4) !density, x-momentum, y-momentum, total energy
+        real(kind=RKD) :: primary(7) !density,u-velocity,v-velocity,pressure,temperature,x-heat flux,y-heat flux
         real(kind=RKD),allocatable,dimension(:,:) :: h,b !distribution function
         real(kind=RKD),allocatable,dimension(:,:,:) :: sh,sb !slope of distribution function in i and j direction
     end type cell_center
@@ -87,6 +91,11 @@ module global_data
         real(kind=RKD) :: flux(4) !mass flux, x and y momentum flux, energy flux
         real(kind=RKD),allocatable,dimension(:,:) :: flux_h,flux_b !flux of distribution function
     end type cell_interface
+
+    !geometry (node coordinates)
+    type :: geom
+        real(kind=RKD) :: x,y !coordinates
+    end type geom
 
     !--------------------------------------------------
     !flow field
@@ -105,12 +114,13 @@ module global_data
     !           (i,j)
     integer :: ixmin,ixmax,iymin,iymax !index range in i and j direction
     integer :: ngrid !number of total grids
+    type(geom),allocatable,dimension(:,:) :: geometry !geometry (node coordinates)
     type(cell_center),allocatable,dimension(:,:) :: ctr !cell centers
     type(cell_interface),allocatable,dimension(:,:) :: vface,hface !vertical and horizontal interfaces
     real(kind=RKD) :: bc_W(4),bc_E(4),bc_S(4),bc_N(4) !boundary conditions at west,east,south and north boundary
 
     !--------------------------------------------------
-    !discrete velocity space. Inefficient implementation but clear code
+    !discrete velocity space
     !--------------------------------------------------
     integer :: unum,vnum !number of velocity points for u and v
     real(kind=RKD) :: umax,vmax !maximum micro velocity
@@ -151,8 +161,8 @@ module tools
         subroutine shakhov_part(H,B,vn,vt,qf,prim,H_plus,B_plus)
             real(kind=RKD),dimension(:,:),intent(in) :: H,B
             real(kind=RKD),dimension(:,:),intent(in) :: vn,vt
-            real(kind=RKD) :: qf(2)
-            real(kind=RKD) :: prim(4)
+            real(kind=RKD),intent(in) :: qf(2)
+            real(kind=RKD),intent(in) :: prim(4)
             real(kind=RKD),dimension(:,:),intent(out) :: H_plus,B_plus
 
             H_plus = 0.8*(1-pr)*prim(4)**2/prim(1)*&
@@ -252,7 +262,7 @@ module tools
         !--------------------------------------------------
         !>calculate collision time
         !>@param[in] prim    :primary variables
-        !>return     get_tau :collision time
+        !>@return    get_tau :collision time
         !--------------------------------------------------
         function get_tau(prim)
             real(kind=RKD),intent(in) :: prim(4)
@@ -263,9 +273,10 @@ module tools
 
         !--------------------------------------------------
         !>get heat flux
-        !>@param[in] h,b   :distribution function
-        !>@param[in] vn,vt :normal and tangential velocity
-        !>@param[in] prim  :primary variables
+        !>@param[in] h,b           :distribution function
+        !>@param[in] vn,vt         :normal and tangential velocity
+        !>@param[in] prim          :primary variables
+        !>@return    get_heat_flux :heat flux in normal and tangential direction
         !--------------------------------------------------
         function get_heat_flux(h,b,vn,vt,prim)
             real(kind=RKD),dimension(:,:),intent(in) :: h,b
@@ -279,9 +290,10 @@ module tools
 
         !--------------------------------------------------
         !>get pressure
-        !>@param[in] h,b   :distribution function
-        !>@param[in] vn,vt :normal and tangential velocity
-        !>@param[in] prim  :primary variables
+        !>@param[in] h,b          :distribution function
+        !>@param[in] vn,vt        :normal and tangential velocity
+        !>@param[in] prim         :primary variables
+        !>@return    get_pressure :pressure
         !--------------------------------------------------
         function get_pressure(h,b,vn,vt,prim)
             real(kind=RKD),dimension(:,:),intent(in) :: h,b
@@ -366,7 +378,7 @@ module flux
             vt = vspace*face%cosx-uspace*face%cosy
 
             !Heaviside step function
-            delta = (vn+abs(vn)+1)/(2*abs(vn)+1)
+            delta = (sign(UP,vn)+1)/2
 
             !--------------------------------------------------
             !reconstruct initial distribution
@@ -516,7 +528,7 @@ module flux
             vt = vspace*face%cosx-uspace*face%cosy
 
             !Heaviside step function. The rotation accounts for the right wall
-            delta = (vn*rot+abs(vn)+1)/(2*abs(vn)+1)
+            delta = (sign(UP,vn)*rot+1)/2
 
             !boundary condition in local frame
             prim = local_frame(bc,face%cosx,face%cosy)
@@ -629,11 +641,11 @@ module flux
         !>@param[in] Mxi        :<\xi^l>
         !>@param[in] alpha,beta :exponential index of u and v
         !>@param[in] delta      :exponential index of \xi
+        !>@return    moment_uv  :moment of <u^\alpha*v^\beta*\xi^\delta*\psi>
         !--------------------------------------------------
         function moment_uv(Mu,Mv,Mxi,alpha,beta,delta)
             real(kind=RKD),intent(in) :: Mu(0:MNUM),Mv(0:MTUM),Mxi(0:2)
-            integer,intent(in) :: alpha,beta 
-            integer,intent(in) :: delta
+            integer,intent(in) :: alpha,beta,delta
             real(kind=RKD) :: moment_uv(4)
 
             moment_uv(1) = Mu(alpha)*Mv(beta)*Mxi(delta/2)
@@ -648,6 +660,7 @@ module flux
         !>@param[in] Mu,Mv      :<u^\alpha>,<v^\beta>
         !>@param[in] Mxi        :<\xi^l>
         !>@param[in] alpha,beta :exponential index of u and v
+        !>@return    moment_au  :moment of <a*u^\alpha*v^\beta*\psi>
         !--------------------------------------------------
         function moment_au(a,Mu,Mv,Mxi,alpha,beta)
             real(kind=RKD),intent(in) :: a(4)
@@ -715,43 +728,47 @@ module solver
         !--------------------------------------------------
         subroutine interpolation()
             integer :: i,j
-                !$omp parallel
-                !--------------------------------------------------
-                !i direction
-                !--------------------------------------------------
-                !$omp do
-                do j=iymin,iymax
-                    call interp_boundary(ctr(ixmin,j),ctr(ixmin,j),ctr(ixmin+1,j),IDIRC) !the last argument indicating i direction
-                    call interp_boundary(ctr(ixmax,j),ctr(ixmax-1,j),ctr(ixmax,j),IDIRC)
-                end do
-                !$omp end do nowait
 
-                !$omp do
-                do j=iymin,iymax
-                    do i=ixmin+1,ixmax-1
-                        call interp_inner(ctr(i-1,j),ctr(i,j),ctr(i+1,j),IDIRC)
-                    end do
-                end do
-                !$omp end do nowait
+            !no interpolation if first order (already set to zero slope when initializing)
+            if (method_interp==FIRST_ORDER) return 
 
-                !--------------------------------------------------
-                !j direction
-                !--------------------------------------------------
-                !$omp do
+            !$omp parallel
+            !--------------------------------------------------
+            !i direction
+            !--------------------------------------------------
+            !$omp do
+            do j=iymin,iymax
+                call interp_boundary(ctr(ixmin,j),ctr(ixmin,j),ctr(ixmin+1,j),IDIRC) !the last argument indicating i direction
+                call interp_boundary(ctr(ixmax,j),ctr(ixmax-1,j),ctr(ixmax,j),IDIRC)
+            end do
+            !$omp end do nowait
+
+            !$omp do
+            do j=iymin,iymax
+                do i=ixmin+1,ixmax-1
+                    call interp_inner(ctr(i-1,j),ctr(i,j),ctr(i+1,j),IDIRC)
+                end do
+            end do
+            !$omp end do nowait
+
+            !--------------------------------------------------
+            !j direction
+            !--------------------------------------------------
+            !$omp do
+            do i=ixmin,ixmax
+                call interp_boundary(ctr(i,iymin),ctr(i,iymin),ctr(i,iymin+1),JDIRC)
+                call interp_boundary(ctr(i,iymax),ctr(i,iymax-1),ctr(i,iymax),JDIRC)
+            end do
+            !$omp end do nowait
+
+            !$omp do
+            do j=iymin+1,iymax-1
                 do i=ixmin,ixmax
-                    call interp_boundary(ctr(i,iymin),ctr(i,iymin),ctr(i,iymin+1),JDIRC)
-                    call interp_boundary(ctr(i,iymax),ctr(i,iymax-1),ctr(i,iymax),JDIRC)
+                    call interp_inner(ctr(i,j-1),ctr(i,j),ctr(i,j+1),JDIRC)
                 end do
-                !$omp end do nowait
-
-                !$omp do
-                do j=iymin+1,iymax-1
-                    do i=ixmin,ixmax
-                        call interp_inner(ctr(i,j-1),ctr(i,j),ctr(i,j+1),JDIRC)
-                    end do
-                end do
-                !$omp end do nowait
-                !$omp end parallel
+            end do
+            !$omp end do nowait
+            !$omp end parallel
         end subroutine interpolation
 
         !--------------------------------------------------
@@ -935,28 +952,32 @@ module io
             real(kind=RKD) :: alpha !another index in molecule model
             real(kind=RKD) :: kn !Knudsen number in reference state
             real(kind=RKD) :: xlength,ylength !length of computational domain in x and y direction
+            real(kind=RKD) :: umid,vmid !middle value in velocity space (for Gaussian-Hermite)
             integer :: xnum,ynum !number of cells in x and y direction
 
             !control
             cfl = 0.8 !CFL number
             eps = 1.0E-5 !convergence criteria
+            method_interp = FIRST_ORDER !first order interpolation. Set to 1 or SECOND_ORDER for second order interpolation
 
             !gas
             ck = 1 !internal degree of freedom
             gam = get_gamma(ck) !ratio of specific heat
             pr = 2.0/3.0 !Prandtl number
             omega = 0.81 !temperature dependence index in VHS model
-
-            !reference viscosity coefficient
             alpha = 1.0 !another index in VHS model
-            kn = 1.0 !Knudsen number in reference state
+            kn = 0.075 !Knudsen number in reference state
             mu_ref = get_mu(kn,alpha,omega) !reference viscosity coefficient
+
+            !velocity space (for Gaussian-Hermite)
+            umid = 0.0
+            vmid = 0.0
 
             !geometry
             xlength = 1.0
             ylength = 1.0
-            xnum = 61
-            ynum = 61
+            xnum = 45
+            ynum = 45
 
             !initial condition (density,u-velocity,v-velocity,lambda=1/temperature)
             init_gas = [1.0, 0.0, 0.0, 1.0]
@@ -968,7 +989,7 @@ module io
             bc_N = [1.0, 0.15, 0.0, 1.0] !north
 
             call init_geometry(xlength,ylength,xnum,ynum) !initialize the geometry
-            call init_velocity() !initialize discrete velocity space using Gaussian-Hermite quadrature
+            call init_velocity_gauss(umid,vmid) !initialize discrete velocity space
             call init_allocation() !allocate arrays
             call init_flow_field(init_gas) !set the initial condition
         end subroutine init
@@ -997,15 +1018,19 @@ module io
             !allocation
             allocate(ctr(ixmin:ixmax,iymin:iymax)) !cell center
             allocate(vface(ixmin:ixmax+1,iymin:iymax),hface(ixmin:ixmax,iymin:iymax+1)) !vertical and horizontal cell interface
+            allocate(geometry(ixmin:ixmax+1,iymin:iymax+1)) !geometry (node coordinates)
 
             !cell length and area
             dx = xlength/(ixmax-ixmin+1)
             dy = ylength/(iymax-iymin+1)
             area = dx*dy
 
+            forall(i=ixmin:ixmax+1,j=iymin:iymax+1) !geometry
+                geometry(i,j)%x = (i-1)*dx
+                geometry(i,j)%y = (j-1)*dy
+            end forall
+
             forall(i=ixmin:ixmax,j=iymin:iymax) !cell center
-                ctr(i,j)%x = (i-0.5)*dx
-                ctr(i,j)%y = (j-0.5)*dy
                 ctr(i,j)%length(1) = dx
                 ctr(i,j)%length(2) = dy
                 ctr(i,j)%area = area
@@ -1025,28 +1050,85 @@ module io
         end subroutine init_geometry
 
         !--------------------------------------------------
-        !>set discrete velocity space using Gaussian-Hermite quadrature
+        !>set discrete velocity space using Newton–Cotes formulas
+        !>@param[inout] unum,vnum :number of velocity points
+        !>@param[in]    umin,vmin :smallest discrete velocity
+        !>@param[in]    umax,vmax :largest discrete velocity
         !--------------------------------------------------
-        subroutine init_velocity()
+        subroutine init_velocity_newton(unum,umin,umax,vnum,vmin,vmax)
+            integer,intent(inout) :: unum,vnum
+            real(kind=RKD),intent(in) :: umin,umax,vmin,vmax
+            real(kind=RKD) :: du,dv !spacing in u and v velocity space
+            integer :: i,j
+
+            !modify unum and vnum if not appropriate
+            unum = (unum/4)*4+1
+            vnum = (vnum/4)*4+1
+    
+            !allocate array
+            allocate(uspace(unum,vnum))
+            allocate(vspace(unum,vnum))
+            allocate(weight(unum,vnum))
+
+            !spacing in u and v velocity space
+            du = (umax-umin)/(unum-1)
+            dv = (vmax-vmin)/(vnum-1)
+
+            !velocity space
+            forall(i=1:unum,j=1:vnum)
+                uspace(i,j) = umin+(i-1)*du
+                vpsace(i,j) = vmin+(j-1)*dv
+                weight(i,j) = (newton_coeff(i,unum)*du)*(newton_coeff(j,vnum)*dv)
+            end forall
+
+            contains
+                !--------------------------------------------------
+                !>calculate the coefficient for newton-cotes formula
+                !>@param[in] idx          :index in velocity space
+                !>@param[in] num          :total number in velocity space
+                !>@return    newton_coeff :coefficient for newton-cotes formula
+                !--------------------------------------------------
+                function newton_coeff(idx,num)
+                    integer,intent(in) :: idx,num
+                    real(kind=RKD) :: newton_coeff
+
+                    if (idx==1 .or. idx==num) then 
+                        newton_coeff = 14.0/45.0
+                    else if (mod(idx-5,4)==0) then
+                        newton_coeff = 28.0/45.0
+                    else if (mod(idx-3,4)==0) then
+                        newton_coeff = 24.0/45.0
+                    else
+                        newton_coeff = 64.0/45.0
+                    end if
+                end function newton_coeff
+        end subroutine init_velocity_newton
+
+        !--------------------------------------------------
+        !>set discrete velocity space using Gaussian-Hermite type quadrature
+        !>@param[in] umid,vmid :middle value of the velocity space, zero or macroscopic velocity
+        !--------------------------------------------------
+        subroutine init_velocity_gauss(umid,vmid)
+            real(kind=RKD),intent(in) :: umid,vmid
             real(kind=RKD) :: vcoords(28), weights(28) !velocity points and weight for 28 points (symmetry)
             integer :: i,j
 
             !set velocity points and weight
-            vcoords = [ -6.59160566329956050,-5.85701465606689450,-5.24328517913818360,-4.69075632095336910,&
-                        -4.17663669586181640,-3.68913412094116210,-3.22111201286315920,-2.76779532432556150,&
-                        -2.32574987411499020,-1.89236044883728030,-1.46553730964660640,-1.04353523254394530,&
-                        -0.62483674287796021,-0.20806738734245300,+0.20806738734245300,+0.62483674287796021,&
-                        +1.04353523254394530,+1.46553730964660640,+1.89236044883728030,+2.32574987411499020,&
-                        +2.76779532432556150,+3.22111201286315920,+3.68913412094116210,+4.17663669586181640,&
-                        +4.69075632095336910,+5.24328517913818360,+5.85701465606689450,+6.59160566329956050]
+            vcoords = [ -0.5392407922630E+01, -0.4628038787602E+01, -0.3997895360339E+01, -0.3438309154336E+01,&
+                        -0.2926155234545E+01, -0.2450765117455E+01, -0.2007226518418E+01, -0.1594180474269E+01,&
+                        -0.1213086106429E+01, -0.8681075880846E+00, -0.5662379126244E+00, -0.3172834649517E+00,&
+                        -0.1331473976273E+00, -0.2574593750171E-01, +0.2574593750171E-01, +0.1331473976273E+00,&
+                        +0.3172834649517E+00, +0.5662379126244E+00, +0.8681075880846E+00, +0.1213086106429E+01,&
+                        +0.1594180474269E+01, +0.2007226518418E+01, +0.2450765117455E+01, +0.2926155234545E+01,&
+                        +0.3438309154336E+01, +0.3997895360339E+01, +0.4628038787602E+01, +0.5392407922630E+01 ]
 
-            weights = [ +0.84476017951965332,+0.65798896551132202,+0.57779419422149658,+0.53077453374862671,&
-                        +0.49934458732604980,+0.47681638598442078,+0.46000820398330688,+0.44718948006629944,&
-                        +0.43733271956443787,+0.42979142069816589,+0.42414394021034241,+0.42011165618896484,&
-                        +0.41751345992088318,+0.41624009609222412,+0.41624009609222412,+0.41751345992088318,&
-                        +0.42011165618896484,+0.42414394021034241,+0.42979142069816589,+0.43733271956443787,&
-                        +0.44718948006629944,+0.46000820398330688,+0.47681638598442078,+0.49934458732604980,&
-                        +0.53077453374862671,+0.57779419422149658,+0.65798896551132202,+0.84476017951965332]
+            weights = [ +0.2070921821819E-12, +0.3391774320172E-09, +0.6744233894962E-07, +0.3916031412192E-05,&
+                        +0.9416408715712E-04, +0.1130613659204E-02, +0.7620883072174E-02, +0.3130804321888E-01,&
+                        +0.8355201801999E-01, +0.1528864568113E+00, +0.2012086859914E+00, +0.1976903952423E+00,&
+                        +0.1450007948865E+00, +0.6573088665062E-01, +0.6573088665062E-01, +0.1450007948865E+00,&
+                        +0.1976903952423E+00, +0.2012086859914E+00, +0.1528864568113E+00, +0.8355201801999E-01,&
+                        +0.3130804321888E-01, +0.7620883072174E-02, +0.1130613659204E-02, +0.9416408715712E-04,&
+                        +0.3916031412192E-05, +0.6744233894962E-07, +0.3391774320172E-09, +0.2070921821819E-12 ]
 
             !set grid number for u-velocity and v-velocity
             unum = 28
@@ -1059,15 +1141,15 @@ module io
 
             !set velocity space and weight
             forall(i=1:unum,j=1:vnum)
-                uspace(i,j) = vcoords(i)
-                vspace(i,j) = vcoords(j)
-                weight(i,j) = weights(i)*weights(j)
+                uspace(i,j) = umid+vcoords(i)
+                vspace(i,j) = vmid+vcoords(j)
+                weight(i,j) = (weights(i)*exp(vcoords(i)**2))*(weights(j)*exp(vcoords(j)**2))
             end forall
 
             !store the maximum micro velocity
             umax = maxval(abs(uspace(:,1)))
             vmax = maxval(abs(vspace(1,:)))
-        end subroutine init_velocity
+        end subroutine init_velocity_gauss
 
         !--------------------------------------------------
         !>allocate arrays
@@ -1082,8 +1164,6 @@ module io
                     allocate(ctr(i,j)%b(unum,vnum))
                     allocate(ctr(i,j)%sh(unum,vnum,2))
                     allocate(ctr(i,j)%sb(unum,vnum,2))
-                    ctr(i,j)%sh = 0.0
-                    ctr(i,j)%sb = 0.0
                 end do
             end do
 
@@ -1128,6 +1208,8 @@ module io
                 ctr(i,j)%w = w
                 ctr(i,j)%h = H
                 ctr(i,j)%b = B
+                ctr(i,j)%sh = 0.0
+                ctr(i,j)%sb = 0.0
             end forall
         end subroutine init_flow_field
 
@@ -1136,26 +1218,33 @@ module io
         !--------------------------------------------------
         subroutine output()
             real(kind=RKD) :: prim(4) !primary variables
-            real(kind=RKD) :: pressure,temperature,qf(2) !pressure,temperature,heat flux
             integer :: i,j
+
+            !prepare solution
+            do j=iymin,iymax
+                do i=ixmin,ixmax
+                    prim = get_primary(ctr(i,j)%w) !primary variables
+                    ctr(i,j)%primary(1:3) = prim(1:3) !density,u,v
+                    ctr(i,j)%primary(4) = get_pressure(ctr(i,j)%h,ctr(i,j)%b,uspace,vspace,prim) !pressure
+                    ctr(i,j)%primary(5) = 2.0*ctr(i,j)%primary(4)/ctr(i,j)%primary(1) !temperature
+                    ctr(i,j)%primary(6:7) = get_heat_flux(ctr(i,j)%h,ctr(i,j)%b,uspace,vspace,prim) !heat flux
+                end do
+            end do
 
             !open result file
             open(unit=RSTFILE,file=RSTFILENAME,status="replace",action="write")
 
             !write header
-            write(RSTFILE,*) "VARIABLES = X, Y, RHO, U, V, T, P, QX, QY"
-            write(RSTFILE,*) "ZONE  I = ",ixmax-ixmin+1,", J = ",iymax-iymin+1
+            write(RSTFILE,*) "VARIABLES = X, Y, RHO, U, V, P, T, QX, QY"
+            write(RSTFILE,*) "ZONE  I = ",ixmax-ixmin+2,", J = ",iymax-iymin+2,"DATAPACKING=BLOCK, VARLOCATION=([3-9]=CELLCENTERED)"
 
-            !write solution
-            do j=iymin,iymax
-                do i=ixmin,ixmax
-                    prim = get_primary(ctr(i,j)%w)
-                    pressure = get_pressure(ctr(i,j)%h,ctr(i,j)%b,uspace,vspace,prim)
-                    temperature = 2.0*pressure/prim(1)
-                    qf = get_heat_flux(ctr(i,j)%h,ctr(i,j)%b,uspace,vspace,prim)
+            !write geometry (node value)
+            write(RSTFILE,"(6(ES23.16,2X))") geometry%x
+            write(RSTFILE,"(6(ES23.16,2X))") geometry%y
 
-                    write(RSTFILE,*) ctr(i,j)%x,ctr(i,j)%y,prim(1),prim(2),prim(3),temperature,pressure,qf(1),qf(2)
-                end do
+            !write solution (cell-centered)
+            do i=1,7
+                write(RSTFILE,"(6(ES23.16,2X))") ctr%primary(i)
             end do
     
             !close file
@@ -1188,7 +1277,7 @@ program main
     !iteration
     do while(.true.)
         call timestep() !calculate time step
-        !call interpolation() !calculate the slope of distribution function
+        call interpolation() !calculate the slope of distribution function
         call evolution() !calculate flux across the interfaces
         call update() !update cell averaged value
 
@@ -1196,11 +1285,11 @@ program main
         if (all(res<eps)) exit
 
         !write iteration situation every 10 iterations
-        !if (mod(iter,10)==0) then
+        if (mod(iter,10)==0) then
             write(*,"(A18,I15,2E15.7)") "iter,sim_time,dt:",iter,sim_time,dt
             write(*,"(A18,4E15.7)") "res:",res
             write(HSTFILE,"(I15,6E15.7)") iter,sim_time,dt,res
-        !end if
+        end if
 
         iter = iter+1
         sim_time = sim_time+dt
