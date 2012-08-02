@@ -15,6 +15,7 @@
 \usepackage{amsmath,amssymb}
 \usepackage{fullpage}
 \usepackage{appendix}
+\usepackage{graphicx,subfigure}
 
 %no indention
 \setlength\parindent{0pt}
@@ -38,11 +39,9 @@
 \makeatother
 
 %optionally load package for code highlighting
-\IfFileExists{minted.sty}
-{
+\IfFileExists{minted.sty} {
     \usepackage{minted}
-}
-{
+}{
     \usepackage{listings}
     \usepackage{color}
     \lstset{language=[90]Fortran,
@@ -61,42 +60,42 @@
 }
 
 \begin{document}
-    %title page
-    \title{User Manual for UGKS1D and UGKS2D Code}
-    \author{Wang Ruijie\\\href{mailto:lainme993@gmail.com}{lainme993@gmail.com}}
-    \maketitle
+%title page
+\title{User Manual for UGKS1D and UGKS2D Code}
+\author{Wang Ruijie\\\href{mailto:lainme993@gmail.com}{lainme993@gmail.com}}
+\maketitle
 
-    %license statement
-    \thispagestyle{empty}
-    Copyright \copyright\ 2012 Wang Ruijie
+%license statement
+\thispagestyle{empty}
+Copyright \copyright\ 2012 Wang Ruijie
 
-    Permission is granted to copy, distribute and/or modify this document
-    under the terms of the GNU Free Documentation License, Version 1.3 or
-    any later version published by the Free Software Foundation; with no
-    Invariant Sections, no Front-Cover Texts, and no Back-Cover Texts.  A
-    copy of the license is included in the section entitled \nameref{chap:fdl}
+Permission is granted to copy, distribute and/or modify this document
+under the terms of the GNU Free Documentation License, Version 1.3 or
+any later version published by the Free Software Foundation; with no
+Invariant Sections, no Front-Cover Texts, and no Back-Cover Texts.  A
+copy of the license is included in the section entitled \nameref{chap:fdl}
 
-    %table of contents
-    \frontmatter
-    \tableofcontents
+%table of contents
+\frontmatter
+\tableofcontents
 
-    \mainmatter
+\mainmatter
 
-    %UGKS method
-    \chapter{Unified Gas-Kinetic Scheme}
-    This chapter describes the Unified Gas-Kinetic Scheme presented in \cite{Xu2010,Xu2011}. This is a 1D formulation. The 2D formulation with directional splitting is presented in \cite{Huang2012}, and can be extended to a truly multidimensional formulation, see\cite{Xu2005}.
+%UGKS method
+\chapter{Unified Gas-Kinetic Scheme}
+This chapter describes the Unified Gas-Kinetic Scheme presented in \cite{Xu2010,Xu2011}. This is a 1D formulation. The 2D formulation with directional splitting is presented in \cite{Huang2012}, and can be extended to a truly multidimensional formulation, see\cite{Xu2005}.
 
-    \section{Model equation}
-    The model equation is the BGK-Shakhov model. In one dimensional case,
-    \begin{equation}
-        \label{eq:bgk-shakhov}
-        \frac{\partial f}{\partial t}+u\frac{\partial f}{\partial x}=\frac{f^+-f}{\tau}
-    \end{equation}
-    where $f$ is the distribution function, $u$ is particle velocity, $\tau=\mu/p$ is particle collision time, $\mu$ is the dynamic viscosity, $p$ is the pressure and $f^+$ is the modified equilibrium distribution function.
+\section{Model equation}
+The model equation is the BGK-Shakhov model. In one dimensional case,
+\begin{equation}
+    \label{eq:bgk-shakhov}
+    \frac{\partial f}{\partial t}+u\frac{\partial f}{\partial x}=\frac{f^+-f}{\tau}
+\end{equation}
+where $f$ is the distribution function, $u$ is particle velocity, $\tau=\mu/p$ is particle collision time, $\mu$ is the dynamic viscosity, $p$ is the pressure and $f^+$ is the modified equilibrium distribution function.
 
-    The modified equilibrium distribution is
-    \begin{equation}
-        f^+ = g\left[1+(1-\Pr){\bf c}\cdot{\bf q}\left(\frac{c^2}{RT}-5\right)/(5pRT)\right]=g+g^+
+The modified equilibrium distribution is
+\begin{equation}
+    f^+ = g\left[1+(1-\Pr){\bf c}\cdot{\bf q}\left(\frac{c^2}{RT}-5\right)/(5pRT)\right]=g+g^+
 \end{equation}
 where $g$ is the Maxwellian distribution, $\Pr$ is the Prandtl number, ${\bf c}$ is the random velocity, $q$ is heat flux, $R$ is gas constant and $T$ is the temperature.
 
@@ -127,7 +126,7 @@ where $\psi=(1,u,1/2(u^2+\xi^2))^T$ is the collision invariants and $d\Xi=dud\xi
 
 The macroscopic variables can be calculated via
 \begin{equation}
-    W=\begin{pmatrix} \rho\\ \rho U\\ \rho E \end{pmatrix} = \int \psi fd\Xi
+W=\begin{pmatrix} \rho\\ \rho U\\ \rho E \end{pmatrix} = \int \psi fd\Xi
 \end{equation}
 \begin{equation}
     p=\frac{1}{3}\int [(u-U)^2+\xi^2]fd\Xi
@@ -234,7 +233,7 @@ In the following, all variables are nondimensionalized, but we will drop the \te
     \label{eq:heatflux}
     \begin{aligned}
         q&=\frac{1}{2}\left[\int(u-U)(u-U)^2h{\rm du}+\int(u-U)b{\rm du}\right]\\
-    &=\frac{1}{2}\left[\sum\alpha_k (u_k-U)(u_k-U)^2 h_k+\sum\alpha_k (u_k-U)b_k\right]
+         &=\frac{1}{2}\left[\sum\alpha_k (u_k-U)(u_k-U)^2 h_k+\sum\alpha_k (u_k-U)b_k\right]
     \end{aligned}
 \end{equation}
 where $\alpha_k$ is the weight of the numerical integration at the k-th particle velocity. The summation is over all the discrete particle velocity.
@@ -299,9 +298,9 @@ Inserting Eq. \ref{eq:f0} and Eq. \ref{eq:g_interface} into Eq. \ref{eq:csolutio
     \label{eq:csolution_final}
     \begin{aligned}
         f(0,t,u_k,\xi)=&(1-e^{-t/\tau})(g_0+g^+)\\
-        &+(\tau(-1+e^{-t/\tau})+te^{-t/\tau})(a^LH[u_k]+a^R(1-H[u_k]))u_kg_0\\
-        &+\tau(t/\tau-1+e^{-t/\tau})Ag_0\\
-        &+e^{-t/\tau}((f_{i+1/2,k}^L-u_kt\sigma_{i,k})H[u_k]+(f_{i+1/2,k}^R-u_kt\sigma_{i+1,k})(1-H[u_k]))\\
+                       &+(\tau(-1+e^{-t/\tau})+te^{-t/\tau})(a^LH[u_k]+a^R(1-H[u_k]))u_kg_0\\
+                       &+\tau(t/\tau-1+e^{-t/\tau})Ag_0\\
+                       &+e^{-t/\tau}((f_{i+1/2,k}^L-u_kt\sigma_{i,k})H[u_k]+(f_{i+1/2,k}^R-u_kt\sigma_{i+1,k})(1-H[u_k]))\\
         =&{\tilde g}_{i+1/2,k}+{\tilde f}_{i+1/2,k}
     \end{aligned}
 \end{equation}
@@ -393,9 +392,9 @@ and the three components of $a^L,a^R$ are calculated from
     \label{eq:micro_slope}
     \begin{aligned}
         a_3&=\frac{4\lambda_0^2}{(K+1)\rho_0}\left[2\frac{\partial\rho E}{\partial x}+\left(U_0^2-\frac{K+1}{2\lambda_0}\right)\frac{\partial\rho}{\partial x}-2U_0\frac{\partial\rho U}{\partial x}\right]\\
-a_2&=\frac{2\lambda_0}{\rho_0}\left(\frac{\partial\rho U}{\partial x}-U_0\frac{\partial\rho}{\partial x}\right)-U_0a_3\\
+        a_2&=\frac{2\lambda_0}{\rho_0}\left(\frac{\partial\rho U}{\partial x}-U_0\frac{\partial\rho}{\partial x}\right)-U_0a_3\\
         a_1&=\frac{1}{\rho_0}\frac{\partial\rho}{\partial x}-U_0a_2-\frac{1}{2}\left(U_0^2+\frac{K+1}{2\lambda_0}\right)a_3
-\end{aligned}
+    \end{aligned}
 \end{equation}
 
 \subsubsection*{Calculate ${\partial W}/{\partial t}$ and $A$}
@@ -462,48 +461,48 @@ The flux of reduced distribution function $h$ is calculated by
 $$
 \begin{aligned}
     {\bf F}_{i+1/2,k}^h &= \int_{t^n}^{t^{n+1}}\int f_{i+1/2,k}u_k d\xi dt\\
-    &= Mt_1 u_k (H_k+H_k^+)\\
-    &+ Mt_2 u_k^2 \left(a_1^L H_k + a_2^L u_k H_k + \frac{1}{2}a_3^L(u_k^2 H_k+B_k)\right)H[u_k]\\
-&+ Mt_2 u_k^2 \left(a_1^R H_k + a_2^R u_k H_k + \frac{1}{2}a_3^R(u_k^2 H_k+B_k)\right)(1-H[u_k])\\
+                        &= Mt_1 u_k (H_k+H_k^+)\\
+                        &+ Mt_2 u_k^2 \left(a_1^L H_k + a_2^L u_k H_k + \frac{1}{2}a_3^L(u_k^2 H_k+B_k)\right)H[u_k]\\
+                        &+ Mt_2 u_k^2 \left(a_1^R H_k + a_2^R u_k H_k + \frac{1}{2}a_3^R(u_k^2 H_k+B_k)\right)(1-H[u_k])\\
                         &+ Mt_3 u_k \left(A_1 H_k + A_2 u_k H_k + \frac{1}{2}A_3(u_k^2 H_k+B_k)\right)\\
-                    &+ Mt_4 u_k h_{i+1/2,k}-Mt_5 u_k^2 \sigma_{i+1/2,k}^h
-                \end{aligned} 
-                $$
+                        &+ Mt_4 u_k h_{i+1/2,k}-Mt_5 u_k^2 \sigma_{i+1/2,k}^h
+\end{aligned} 
+$$
 
-                The flux of reduced distribution function $b$ is calculated by
-                $$
-                \begin{aligned}
-                    {\bf F}_{i+1/2,k}^h &= \int_{t^n}^{t^{n+1}}\int f_{i+1/2,k}u_k d\xi dt\\
-                    &= Mt_1 u_k (B_k+B_k^+)\\
-                    &+ Mt_2 u_k^2 \left(a_1^L B_k + a_2^L u_k B_k + \frac{1}{2}a_3^L(u_k^2 B_k+<\xi^4>H_k)\right)H[u_k]\\
-                &+ Mt_2 u_k^2 \left(a_1^R B_k + a_2^R u_k B_k + \frac{1}{2}a_3^R(u_k^2 B_k+<\xi^4>H_k)\right)(1-H[u_k])\\
-            &+ Mt_3 u_k \left(A_1 B_k + A_2 u_k B_k + \frac{1}{2}A_3(u_k^2 B_k+<\xi^4>H_k)\right)\\
-        &+ Mt_4 u_k b_{i+1/2,k}-Mt_5 u_k^2 \sigma_{i+1/2,k}^b
-    \end{aligned} 
-    $$
+The flux of reduced distribution function $b$ is calculated by
+$$
+\begin{aligned}
+    {\bf F}_{i+1/2,k}^h &= \int_{t^n}^{t^{n+1}}\int f_{i+1/2,k}u_k d\xi dt\\
+                        &= Mt_1 u_k (B_k+B_k^+)\\
+                        &+ Mt_2 u_k^2 \left(a_1^L B_k + a_2^L u_k B_k + \frac{1}{2}a_3^L(u_k^2 B_k+<\xi^4>H_k)\right)H[u_k]\\
+                        &+ Mt_2 u_k^2 \left(a_1^R B_k + a_2^R u_k B_k + \frac{1}{2}a_3^R(u_k^2 B_k+<\xi^4>H_k)\right)(1-H[u_k])\\
+                        &+ Mt_3 u_k \left(A_1 B_k + A_2 u_k B_k + \frac{1}{2}A_3(u_k^2 B_k+<\xi^4>H_k)\right)\\
+                        &+ Mt_4 u_k b_{i+1/2,k}-Mt_5 u_k^2 \sigma_{i+1/2,k}^b
+\end{aligned} 
+$$
 
-    \section{Update cell averaged value}
-    The procedure is shown in Figure. \ref{pic:update}
+\section{Update cell averaged value}
+The procedure is shown in Figure. \ref{pic:update}
 
-    \begin{figure}[htb!]
-        \centering
-        \begin{tikzpicture}[thick]
-            \path[line] node[block] (wn) {store $W^n$ and calculate $H^n,B^n,\tau^n$};
-            \path[line] node[block,below of=wn] (ww) {calculate $W^{n+1}$ by Eq. \ref{eq:conservative_discrete},and $H^{n+1},B^{n+1},\tau^{n+1}$}
-            (wn) edge (ww);
-            \path[line] (ww) ++(0,-2.0) coordinate node[block] (gp) {calculate\\heat flux ${\bf q}$ with $h^n,b^n,W^n$\\ $h^{+(n)},b^{+(n)}$ with ${\bf q},H^n,B^n,W^n$\\ $h^{+(n+1)},b^{+(n+1)}$ with ${\bf q},H^{n+1},B^{n+1},W^{n+1}$}
-            (ww) edge (gp);
-            \path[line] (gp) ++(0,-2.0) coordinate node[block] (ff) {calculate $h^{n+1}$ and $b^{n+1}$}
-            (gp) edge (ff);
-        \end{tikzpicture}
-        \caption{update cell averaged value}
-        \label{pic:update}
-    \end{figure}
+\begin{figure}[htb!]
+    \centering
+    \begin{tikzpicture}[thick]
+        \path[line] node[block] (wn) {store $W^n$ and calculate $H^n,B^n,\tau^n$};
+        \path[line] node[block,below of=wn] (ww) {calculate $W^{n+1}$ by Eq. \ref{eq:conservative_discrete},and $H^{n+1},B^{n+1},\tau^{n+1}$}
+        (wn) edge (ww);
+        \path[line] (ww) ++(0,-2.0) coordinate node[block] (gp) {calculate\\heat flux ${\bf q}$ with $h^n,b^n,W^n$\\ $h^{+(n)},b^{+(n)}$ with ${\bf q},H^n,B^n,W^n$\\ $h^{+(n+1)},b^{+(n+1)}$ with ${\bf q},H^{n+1},B^{n+1},W^{n+1}$}
+        (ww) edge (gp);
+        \path[line] (gp) ++(0,-2.0) coordinate node[block] (ff) {calculate $h^{n+1}$ and $b^{n+1}$}
+        (gp) edge (ff);
+    \end{tikzpicture}
+    \caption{update cell averaged value}
+    \label{pic:update}
+\end{figure}
 
-    The equation for updating $h^{n+1}$ and $b^{n+1}$ can be obtained from Eq. \ref{eq:bgk-shakhov_discrete}
-    $$
-    \begin{aligned}
-        h_{i,k}^{n+1} &= \left(1+\frac{\Delta t}{2\tau^{n+1}}\right)^{-1}\left[h_{i,k}^n+\frac{1}{\Delta x}({\bf F}_{i-1/2}^h-{\bf F}_{i+1/2}^h)+\frac{\Delta t}{2}\left(\frac{h_{i,k}^{+(n+1)}}{\tau^{n+1}}+\frac{h_{i,k}^{+(n)}-h_{i,k}^n}{\tau^n}\right)\right]\\
+The equation for updating $h^{n+1}$ and $b^{n+1}$ can be obtained from Eq. \ref{eq:bgk-shakhov_discrete}
+$$
+\begin{aligned}
+    h_{i,k}^{n+1} &= \left(1+\frac{\Delta t}{2\tau^{n+1}}\right)^{-1}\left[h_{i,k}^n+\frac{1}{\Delta x}({\bf F}_{i-1/2}^h-{\bf F}_{i+1/2}^h)+\frac{\Delta t}{2}\left(\frac{h_{i,k}^{+(n+1)}}{\tau^{n+1}}+\frac{h_{i,k}^{+(n)}-h_{i,k}^n}{\tau^n}\right)\right]\\
     b_{i,k}^{n+1} &= \left(1+\frac{\Delta t}{2\tau^{n+1}}\right)^{-1}\left[b_{i,k}^n+\frac{1}{\Delta x}({\bf F}_{i-1/2}^b-{\bf F}_{i+1/2}^b)+\frac{\Delta t}{2}\left(\frac{b_{i,k}^{+(n+1)}}{\tau^{n+1}}+\frac{b_{i,k}^{+(n)}-b_{i,k}^n}{\tau^n}\right)\right]\\
 \end{aligned} 
 $$
@@ -552,7 +551,7 @@ The makefile can be used to compile the two codes, UGKS1D and UGKS2D, and also t
 \begin{itemize}
     \item Fortran Compiler: either ifort or gfortran, supporting Fortran 2003
     \item Bash shell
-    \item Latex: only for compilation of the manual. It requires hyperref, parskip, amsmath, amssymb, fullpage, appendix, listings or minted packages, and also bibtex, dvips and ps2pdf.
+    \item Latex: only for compilation of the manual. It requires hyperref, parskip, amsmath, amssymb, fullpage, appendix, graphicx, subfigure, listings or minted packages, and also bibtex, dvips and ps2pdf.
 \end{itemize}
 
 By default, the make command will compile both UGKS1D and UGKS2D with openmp and ifort. This behavior can be changed by specifying the target and passing parameters.
@@ -606,8 +605,9 @@ This program uses \href{http://git-scm.com/}{GIT} for version control, and the s
 \end{minted}
 
 \section{UGKS1D Code}
+\subsection{Shock-structure problem}
+\subsection{Other information}
 
-%UGKS2D code
 \section{UGKS2D Code}
 \subsection{Differences with 1D}
 For 2D problem, many expressions need to be slightly changed. For example, the Maxwellian distribution function becomes
@@ -630,7 +630,7 @@ $$
 \begin{aligned}
     a_4&=\frac{4\lambda_0^2}{(K+2)\rho_0}\left[2\frac{\partial\rho E}{\partial x}+\left(U_0^2+V_0^2-\frac{K+2}{2\lambda_0}\right)\frac{\partial\rho}{\partial x}-2U_0\frac{\partial\rho U}{\partial x}-2V_0\frac{\partial\rho V}{\partial x}\right]\\
     a_3&=\frac{2\lambda_0}{\rho_0}\left(\frac{\partial\rho V}{\partial x}-V_0\frac{\partial\rho}{\partial x}\right)-V_0a_4\\
-a_2&=\frac{2\lambda_0}{\rho_0}\left(\frac{\partial\rho U}{\partial x}-U_0\frac{\partial\rho}{\partial x}\right)-U_0a_4\\
+    a_2&=\frac{2\lambda_0}{\rho_0}\left(\frac{\partial\rho U}{\partial x}-U_0\frac{\partial\rho}{\partial x}\right)-U_0a_4\\
     a_1&=\frac{1}{\rho_0}\frac{\partial\rho}{\partial x}-U_0a_2-V_0a_3-\frac{1}{2}\left(U_0^2+V_0^2+\frac{k+2}{2\lambda_0}\right)a_4
 \end{aligned}
 $$
@@ -656,23 +656,37 @@ In the code, the default test case is for $T_W = 273K, U_W=50m/s, {\rm Kn} = l_{
 
 Choose the initial condition as reference state, the settings are
 \begin{itemize}
-    \item First order interpolation
-    \item VHS model
+    \item Second order interpolation
+    \item VHS model for collision time
+    \item HS model for reference state
     \item Prandtl number $\Pr=2.0/3.0$, Knudsen number ${\rm Kn}_\infty=0.075$ (at reference state)
     \item $T_W=1, U_W=0.15$
     \item $L=1$ with 45x45 grids
     \item Gaussian quadrature with 28x28 velocity points
 \end{itemize}
 
-\subsection{Other information}
-The Gaussian quadrature used in the code is from Table IIa of \cite{Shizgal1981}, which is better than Gaussian-Hermite quadrature in high Knudsen number. But for the cavity problem with ${\rm Kn}>=1$, it's recommended to use Newton-Cotes formula of 61x61 grids with velocity range $u,v=-4-4$ to avoid oscillating in the solution. For example, the setting for Newton-Cotes integration
+Figure. \ref{pic:cavity_solution} shows the result for the above setup.
 
-%\subsection{Numerical integration}
-%The UGKS2D code provides two types of numerical integration
-%\begin{itemize}
-%\item Newton-Cotes with composite Boole's rule
-%\item Gaussian quadrature described in \cite{Shizgal1981}
-%\end{itemize}
+\begin{figure}
+    \centering
+    \subfigure[Temperature contour]{
+        \includegraphics[width=7cm,height=6.8cm]{temperature.eps}
+    }
+    \subfigure[Heat flux]{
+        \includegraphics[width=7cm,height=6.8cm]{heatflux.eps}
+    }
+    \subfigure[U-velocity along vertical center line]{
+        \includegraphics[width=7cm,height=6.8cm]{vline.eps}
+    }
+    \subfigure[V-velocity along horizontal center line]{
+        \includegraphics[width=7cm,height=6.8cm]{hline.eps}
+    }
+    \caption{Cavity flow at ${\rm Kn}=0.075$. (a) temperature contour. The black lines are from DSMC, the white lines and background contour are from UGKS; (b) heat flux lines; (c) x direction velocity along the vertical center line (normalized by wall velocity); (d) y direction velocity along the horizontal center line (normalized by wall velocity).}
+    \label{pic:cavity_solution}
+\end{figure}
+
+\subsection{Other information}
+The Gaussian quadrature used in the code is from Table IIa of \cite{Shizgal1981}, which is better than Gaussian-Hermite quadrature in high Knudsen number. But for the cavity problem with ${\rm Kn}>=1$, Newton-Cotes formula of 61x61 grids with velocity range $u,v=-4-4$ can avoid oscillating in the solution, which happens with Gaussian quadrature and second order interpolation. For example, the setting for Newton-Cotes integration
 
 \begin{minted}{fortran}
     subroutine init()
@@ -693,6 +707,8 @@ The Gaussian quadrature used in the code is from Table IIa of \cite{Shizgal1981}
     end subroutine init
 \end{minted}
 
+On Intel\textregistered\ Core\textsuperscript{\texttrademark} Quad Processor Q9450 (12M Cache, 2.66 GHz, 1333 MHz FSB) with openmp enabled, the computation time of the above setup is about 16 minutes (with openmp). With 65x65 physical space, the computation time is about 35 minutes.
+
 %license
 \backmatter
 \input{fdl}
@@ -701,6 +717,7 @@ The Gaussian quadrature used in the code is from Table IIa of \cite{Shizgal1981}
 \begin{appendices}
     \setcounter{chapter}{1}
 
+    %moments of maxwell
     \appxchapter{Moments of Maxwellian distribution function}
     \label{appendix:moments}
     In the program, the moments of Maxwellian distribution function is frequently used, and they are usually obtained from subroutines.
@@ -747,12 +764,12 @@ The Gaussian quadrature used in the code is from Table IIa of \cite{Shizgal1981}
         <u^n><\xi^m>\\
         <u^{n+1}><\xi^m>\\
         \frac{1}{2}\left(<u^{n+2}><\xi^m>+<u^n><\xi^{m+2}>\right)
-\end{pmatrix} 
-$$
+    \end{pmatrix} 
+    $$
 
-\section*{Moments of $<au^n\psi>$}
-There are three components for 1D problem
-$$<au^n\psi>=a_1<u^n\psi>+a_2<u^{n+1}\psi>+\frac{1}{2}a_3\left(<u^{n+2}\psi>+<u^n\xi^2\psi>\right)$$
+    \section*{Moments of $<au^n\psi>$}
+    There are three components for 1D problem
+    $$<au^n\psi>=a_1<u^n\psi>+a_2<u^{n+1}\psi>+\frac{1}{2}a_3\left(<u^{n+2}\psi>+<u^n\xi^2\psi>\right)$$
 \end{appendices}
 
 %References
