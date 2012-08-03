@@ -1060,35 +1060,39 @@ module io
 
         !--------------------------------------------------
         !>set discrete velocity space using Newton–Cotes formulas
-        !>@param[inout] unum,vnum :number of velocity points
-        !>@param[in]    umin,vmin :smallest discrete velocity
-        !>@param[in]    umax,vmax :largest discrete velocity
+        !>@param[inout] num_u,num_v :number of velocity points
+        !>@param[in]    min_u,min_v :smallest discrete velocity
+        !>@param[in]    max_u,max_v :largest discrete velocity
         !--------------------------------------------------
-        subroutine init_velocity_newton(unum,umin,umax,vnum,vmin,vmax)
-            integer,intent(inout) :: unum,vnum
-            real(kind=RKD),intent(in) :: umin,umax,vmin,vmax
+        subroutine init_velocity_newton(num_u,min_u,max_u,num_v,min_v,max_v)
+            integer,intent(inout) :: num_u,num_v
+            real(kind=RKD),intent(in) :: min_u,max_u,min_v,max_v
             real(kind=RKD) :: du,dv !spacing in u and v velocity space
             integer :: i,j
 
             !modify unum and vnum if not appropriate
-            unum = (unum/4)*4+1
-            vnum = (vnum/4)*4+1
-    
+            unum = (num_u/4)*4+1
+            vnum = (num_v/4)*4+1
+
             !allocate array
             allocate(uspace(unum,vnum))
             allocate(vspace(unum,vnum))
             allocate(weight(unum,vnum))
 
             !spacing in u and v velocity space
-            du = (umax-umin)/(unum-1)
-            dv = (vmax-vmin)/(vnum-1)
+            du = (max_u-min_u)/(num_u-1)
+            dv = (max_v-min_v)/(num_v-1)
 
             !velocity space
             forall(i=1:unum,j=1:vnum)
-                uspace(i,j) = umin+(i-1)*du
-                vspace(i,j) = vmin+(j-1)*dv
+                uspace(i,j) = min_u+(i-1)*du
+                vspace(i,j) = min_v+(j-1)*dv
                 weight(i,j) = (newton_coeff(i,unum)*du)*(newton_coeff(j,vnum)*dv)
             end forall
+
+            !maximum micro velocity
+            umax = max_u
+            vmax = max_v
 
             contains
                 !--------------------------------------------------
