@@ -41,6 +41,7 @@ module global_data
     character(len=255),parameter :: RSTFILENAME = "shock.rst" !result file name
     integer :: iter !iteration
     integer :: method_interp !interpolation method
+    integer :: method_output !output as cell centered or point value
 
     !--------------------------------------------------
     !gas properties
@@ -63,6 +64,9 @@ module global_data
     !interpolation
     integer,parameter :: FIRST_ORDER = 0 !first order interpolation
     integer,parameter :: SECOND_ORDER = 1 !second order interpolation
+    !output
+    integer,parameter :: CENTER = 1 !output solution as cell centered value
+    integer,parameter :: POINTS = 2 !output solution as point value
 
     !--------------------------------------------------
     !basic derived type
@@ -70,6 +74,7 @@ module global_data
     !cell center
     type :: cell_center
         !geometry
+        real(kind=RKD) :: x !cell center coordinates
         real(kind=RKD) :: length !length
         !flow field
         real(kind=RKD) :: w(3) !density, x-momentum,total energy
