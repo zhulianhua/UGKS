@@ -41,6 +41,7 @@ module global_data
     character(len=255),parameter :: RSTFILENAME = "cavity.rst" !result file name
     integer :: iter !iteration
     integer :: method_interp !interpolation method
+    integer :: method_output !output as cell centered or point value
 
     !--------------------------------------------------
     !gas properties
@@ -66,6 +67,9 @@ module global_data
     !interpolation
     integer,parameter :: FIRST_ORDER = 0 !first order interpolation
     integer,parameter :: SECOND_ORDER = 1 !second order interpolation
+    !output
+    integer,parameter :: CENTER = 1 !output solution as cell centered value
+    integer,parameter :: POINTS = 2 !output solution as point value
 
     !--------------------------------------------------
     !basic derived type
@@ -73,6 +77,7 @@ module global_data
     !cell center
     type :: cell_center
         !geometry
+        real(kind=RKD) :: x,y !cell center coordinates
         real(kind=RKD) :: area !cell area
         real(kind=RKD) :: length(2) !length in i and j direction
         !flow field
@@ -92,10 +97,10 @@ module global_data
         real(kind=RKD),allocatable,dimension(:,:) :: flux_h,flux_b !flux of distribution function
     end type cell_interface
 
-    !geometry (node coordinates)
-    type :: geom
+    !grid geometry(node coordinates)
+    type :: grid
         real(kind=RKD) :: x,y !coordinates
-    end type geom
+    end type grid
 
     !--------------------------------------------------
     !flow field
@@ -114,7 +119,7 @@ module global_data
     !           (i,j)
     integer :: ixmin,ixmax,iymin,iymax !index range in i and j direction
     integer :: ngrid !number of total grids
-    type(geom),allocatable,dimension(:,:) :: geometry !geometry (node coordinates)
+    type(grid),allocatable,dimension(:,:) :: geometry !geometry (node coordinates)
     type(cell_center),allocatable,dimension(:,:) :: ctr !cell centers
     type(cell_interface),allocatable,dimension(:,:) :: vface,hface !vertical and horizontal interfaces
     real(kind=RKD) :: bc_W(4),bc_E(4),bc_S(4),bc_N(4) !boundary conditions at west,east,south and north boundary
@@ -949,8 +954,8 @@ module io
         !--------------------------------------------------
         subroutine init()
             real(kind=RKD) :: init_gas(4) !initial condition
-            real(kind=RKD) :: alpha !another index in molecule model
             real(kind=RKD) :: kn !Knudsen number in reference state
+            real(kind=RKD) :: alpha_ref,omega_ref !molecule model coefficient in reference state
             real(kind=RKD) :: xlength,ylength !length of computational domain in x and y direction
             real(kind=RKD) :: umid,vmid !middle value in velocity space (for Gaussian-Hermite)
             integer :: xnum,ynum !number of cells in x and y direction
@@ -958,16 +963,18 @@ module io
             !control
             cfl = 0.8 !CFL number
             eps = 1.0E-5 !convergence criteria
-            method_interp = FIRST_ORDER !first order interpolation. Set to 1 or SECOND_ORDER for second order interpolation
+            method_interp = SECOND_ORDER !second order interpolation
+            method_output = POINTS !output solution as point (node) value
 
             !gas
             ck = 1 !internal degree of freedom
             gam = get_gamma(ck) !ratio of specific heat
             pr = 2.0/3.0 !Prandtl number
             omega = 0.81 !temperature dependence index in VHS model
-            alpha = 1.0 !another index in VHS model
             kn = 0.075 !Knudsen number in reference state
-            mu_ref = get_mu(kn,alpha,omega) !reference viscosity coefficient
+            alpha_ref = 1.0 !coefficient in HS model
+            omega_ref = 0.5 !coefficient in HS model
+            mu_ref = get_mu(kn,alpha_ref,omega_ref) !reference viscosity coefficient
 
             !velocity space (for Gaussian-Hermite)
             umid = 0.0
@@ -1025,12 +1032,14 @@ module io
             dy = ylength/(iymax-iymin+1)
             area = dx*dy
 
-            forall(i=ixmin:ixmax+1,j=iymin:iymax+1) !geometry
+            forall(i=ixmin:ixmax+1,j=iymin:iymax+1) !geometry (node coordinate)
                 geometry(i,j)%x = (i-1)*dx
                 geometry(i,j)%y = (j-1)*dy
             end forall
 
             forall(i=ixmin:ixmax,j=iymin:iymax) !cell center
+                ctr(i,j)%x = (i-0.5)*dx
+                ctr(i,j)%y = (j-0.5)*dy
                 ctr(i,j)%length(1) = dx
                 ctr(i,j)%length(2) = dy
                 ctr(i,j)%area = area
@@ -1236,11 +1245,21 @@ module io
 
             !write header
             write(RSTFILE,*) "VARIABLES = X, Y, RHO, U, V, P, T, QX, QY"
-            write(RSTFILE,*) "ZONE  I = ",ixmax-ixmin+2,", J = ",iymax-iymin+2,"DATAPACKING=BLOCK, VARLOCATION=([3-9]=CELLCENTERED)"
 
-            !write geometry (node value)
-            write(RSTFILE,"(6(ES23.16,2X))") geometry%x
-            write(RSTFILE,"(6(ES23.16,2X))") geometry%y
+            select case(method_output)
+                case(CENTER)
+                    write(RSTFILE,*) "ZONE  I = ",ixmax-ixmin+2,", J = ",iymax-iymin+2,"DATAPACKING=BLOCK, VARLOCATION=([3-9]=CELLCENTERED)"
+
+                    !write geometry (node value)
+                    write(RSTFILE,"(6(ES23.16,2X))") geometry%x
+                    write(RSTFILE,"(6(ES23.16,2X))") geometry%y
+                case(POINTS)
+                    write(RSTFILE,*) "ZONE  I = ",ixmax-ixmin+1,", J = ",iymax-iymin+1,"DATAPACKING=BLOCK"
+
+                    !write geometry (cell centered value)
+                    write(RSTFILE,"(6(ES23.16,2X))") ctr%x
+                    write(RSTFILE,"(6(ES23.16,2X))") ctr%y
+            end select
 
             !write solution (cell-centered)
             do i=1,7
