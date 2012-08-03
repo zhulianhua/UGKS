@@ -92,7 +92,8 @@ module global_data
     !  (i)|      (i)     |(i+1)
     !     ----------------
     integer :: ixmin,ixmax !index range
-    real(kind=RKD),allocatable,dimension(:) :: geometry !geometry coordinate (node)
+    integer :: ngrid !number of total grids
+    real(kind=RKD),allocatable,dimension(:) :: geometry !geometry (node coordinates)
     type(cell_center),allocatable,dimension(:) :: ctr !cell centers
     type(cell_interface),allocatable,dimension(:) :: vface !vertical interfaces
     real(kind=RKD) :: bc_W(3),bc_E(3) !boundary conditions at west and east
@@ -725,7 +726,7 @@ module solver
             end do
 
             !final residual
-            res = sqrt((ixmax-ixmin+1)*sum_res)/(sum_avg+SMV)
+            res = sqrt(ngrid*sum_res)/(sum_avg+SMV)
         end subroutine update
 
         !--------------------------------------------------
@@ -780,25 +781,27 @@ module io
         !--------------------------------------------------
         subroutine init()
             real(kind=RKD) :: init_gas(3) !initial condition
-            real(kind=RKD) :: alpha !another index in molecule model
+            real(kind=RKD) :: alpha_ref,omega_ref
             real(kind=RKD) :: kn !Knudsen number in reference state
             real(kind=RKD) :: xlength !length of computational domain
-            real(kind=RKD) :: umin,umax !smallest and largest discrete velocity (for newton-cotes)
+            real(kind=RKD) :: umin !smallest and largest discrete velocity (for newton-cotes)
             integer :: xnum !number of cells
 
             !control
             cfl = 0.8 !CFL number
             eps = 1.0E-5 !convergence criteria
             method_interp = FIRST_ORDER !first order interpolation. Set to 1 or SECOND_ORDER for second order interpolation
+            method_output = POINTS !output solution as point (node) value
 
             !gas
-            ck = 1 !internal degree of freedom
+            ck = 2 !internal degree of freedom
             gam = get_gamma(ck) !ratio of specific heat
             pr = 2.0/3.0 !Prandtl number
             omega = 0.81 !temperature dependence index in VHS model
-            alpha = 1.0 !another index in VHS model
             kn = 0.075 !Knudsen number in reference state
-            mu_ref = get_mu(kn,alpha,omega) !reference viscosity coefficient
+            alpha_ref = 1.0 !coefficient in HS model
+            omega_ref = 0.5 !coefficient in HS model
+            mu_ref = get_mu(kn,alpha_ref,omega_ref) !reference viscosity coefficient
 
             !velocity space
             unum = 61
@@ -837,6 +840,9 @@ module io
             ixmin = 1
             ixmax = xnum
 
+            !total number of cell
+            ngrid = (ixmax-ixmin+1)
+
             !allocation
             allocate(ctr(ixmin:ixmax)) !cell center
             allocate(vface(ixmin:ixmax+1)) !vertical and horizontal cell interface
@@ -845,42 +851,46 @@ module io
             !cell length and area
             dx = xlength/(ixmax-ixmin+1)
 
-            forall(i=ixmin:ixmax+1) !x coordinates (nodal value)
+            forall(i=ixmin:ixmax+1) !x coordinates (node value)
                 geometry(i) = (i-1)*dx
             end forall
 
             forall(i=ixmin:ixmax) !cell center
+                ctr(i)%x = (i-0.5)*dx
                 ctr(i)%length = dx
             end forall
         end subroutine init_geometry
 
         !--------------------------------------------------
         !>set discrete velocity space using Newton–Cotes formulas
-        !>@param[inout] unum :number of velocity points
-        !>@param[in]    umin :smallest discrete velocity
-        !>@param[in]    umax :largest discrete velocity
+        !>@param[inout] num_u :number of velocity points
+        !>@param[in]    min_u :smallest discrete velocity
+        !>@param[in]    max_u :largest discrete velocity
         !--------------------------------------------------
-        subroutine init_velocity_newton(unum,umin,umax)
-            integer,intent(inout) :: unum
-            real(kind=RKD),intent(in) :: umin,umax
+        subroutine init_velocity_newton(num_u,min_u,max_u)
+            integer,intent(inout) :: num_u
+            real(kind=RKD),intent(in) :: min_u,max_u
             real(kind=RKD) :: du !spacing in u velocity space
             integer :: i
 
             !modify unum if not appropriate
-            unum = (unum/4)*4+1
+            unum = (num_u/4)*4+1
     
             !allocate array
             allocate(uspace(unum))
             allocate(weight(unum))
 
             !spacing in u and v velocity space
-            du = (umax-umin)/(unum-1)
+            du = (max_u-min_u)/(unum-1)
 
             !velocity space
             forall(i=1:unum)
-                uspace(i) = umin+(i-1)*du
+                uspace(i) = min_u+(i-1)*du
                 weight(i) = (newton_coeff(i,unum)*du)
             end forall
+
+            !maximum micro velocity
+            umax = max_u
 
             contains
                 !--------------------------------------------------
@@ -977,10 +987,20 @@ module io
 
             !write header
             write(RSTFILE,*) "VARIABLES = X, RHO, U, P, T, QX"
-            write(RSTFILE,*) "ZONE  I = ",ixmax-ixmin+2,", DATAPACKING=BLOCK, VARLOCATION=([2-6]=CELLCENTERED)"
 
-            !write geometry (node value)
-            write(RSTFILE,"(6(ES23.16,2X))") geometry
+            select case(method_output)
+                case(CENTER)
+                    write(RSTFILE,*) "ZONE  I = ",ixmax-ixmin+2,", DATAPACKING=BLOCK, VARLOCATION=([2-6]=CELLCENTERED)"
+
+                    !write geometry (node value)
+                    write(RSTFILE,"(6(ES23.16,2X))") geometry
+                case(POINTS)
+                    write(RSTFILE,*) "ZONE  I = ",ixmax-ixmin+1,", DATAPACKING=BLOCK"
+
+                    !write geometry (cell centered value)
+                    write(RSTFILE,"(6(ES23.16,2X))") ctr%x
+            end select
+
 
             !write solution (cell-centered)
             do i=1,5
@@ -1021,16 +1041,15 @@ program main
         call evolution() !calculate flux across the interfaces
         call update() !update cell averaged value
 
+        !check if exit
+        if (all(res<eps)) exit
+
         !write iteration situation every 10 iterations
-        !if (mod(iter,10)==0) then
+        if (mod(iter,10)==0) then
             write(*,"(A18,I15,2E15.7)") "iter,sim_time,dt:",iter,sim_time,dt
             write(*,"(A18,3E15.7)") "res:",res
             write(HSTFILE,"(I15,5E15.7)") iter,sim_time,dt,res
-        !end if
-
-        !check if exit
-        !if (all(res<eps)) exit
-        if (iter==22) exit
+        end if
 
         iter = iter+1
         sim_time = sim_time+dt

@@ -1080,8 +1080,8 @@ module io
             allocate(weight(unum,vnum))
 
             !spacing in u and v velocity space
-            du = (max_u-min_u)/(num_u-1)
-            dv = (max_v-min_v)/(num_v-1)
+            du = (max_u-min_u)/(unum-1)
+            dv = (max_v-min_v)/(vnum-1)
 
             !velocity space
             forall(i=1:unum,j=1:vnum)
