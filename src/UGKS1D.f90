@@ -55,9 +55,6 @@ module global_data
     !--------------------------------------------------
     !macros for a readable code
     !--------------------------------------------------
-    !rotation
-    integer,parameter :: RN = 1 !no frame rotation
-    integer,parameter :: RY = -1 !with frame rotation
     !I/O
     integer,parameter :: HSTFILE = 20 !history file ID
     integer,parameter :: RSTFILE = 21 !result file ID
@@ -410,81 +407,6 @@ module flux
         end subroutine calc_flux
         
         !--------------------------------------------------
-        !>calculate flux of boundary interface, assuming left wall
-        !>@param[in]    bc   :boundary condition
-        !>@param[inout] face :the boundary interface
-        !>@param[in]    cell :cell next to the boundary interface
-        !>@param[in]    rot  :indicating rotation
-        !--------------------------------------------------
-        subroutine calc_flux_boundary(bc,face,cell,rot) 
-            real(kind=RKD),intent(in) :: bc(3)
-            type(cell_interface),intent(inout) :: face
-            type(cell_center),intent(in) :: cell
-            integer,intent(in) :: rot
-            real(kind=RKD),allocatable,dimension(:) :: h,b !distribution function
-            real(kind=RKD),allocatable,dimension(:) :: H0,B0 !Maxwellian distribution function at the wall
-            integer,allocatable,dimension(:) :: delta !Heaviside step function
-            real(kind=RKD) :: prim(3) !boundary condition in local frame
-            real(kind=RKD) :: SF,SG
-
-            !--------------------------------------------------
-            !prepare
-            !--------------------------------------------------
-            !allocate array
-            allocate(delta(unum))
-            allocate(h(unum))
-            allocate(b(unum))
-            allocate(H0(unum))
-            allocate(B0(unum))
-
-            !Heaviside step function. The rotation accounts for the right wall
-            delta = (sign(UP,uspace)*rot+1)/2
-
-            !copy boundary condition
-            prim = bc
-
-            !--------------------------------------------------
-            !obtain h^{in} and b^{in}, rotation accounts for the right wall
-            !--------------------------------------------------
-            h = cell%h-rot*0.5*cell%length*cell%sh
-            b = cell%b-rot*0.5*cell%length*cell%sb
-
-            !--------------------------------------------------
-            !calculate wall density and Maxwellian distribution
-            !--------------------------------------------------
-            SF = sum(weight*uspace*h*(1-delta))
-            SG = (prim(3)/PI)**(1.0/2.0)*sum(weight*uspace*exp(-prim(3)*(uspace-prim(2))**2)*delta)
-
-            prim(1) = -SF/SG
-
-            call discrete_maxwell(H0,B0,prim)
-
-            !--------------------------------------------------
-            !distribution function at the boundary interface
-            !--------------------------------------------------
-            h = H0*delta+h*(1-delta)
-            b = B0*delta+b*(1-delta)
-
-            !--------------------------------------------------
-            !calculate flux
-            !--------------------------------------------------
-            face%flux(1) = sum(weight*uspace*h)
-            face%flux(2) = sum(weight*uspace*uspace*h)
-            face%flux(3) = 0.5*sum(weight*uspace*(uspace**2*h+b))
-
-            face%flux_h = uspace*h
-            face%flux_b = uspace*b
-
-            !--------------------------------------------------
-            !final flux
-            !--------------------------------------------------
-            !total flux
-            face%flux = dt*face%flux
-            face%flux_h = dt*face%flux_h
-            face%flux_b = dt*face%flux_b
-        end subroutine calc_flux_boundary
-
-        !--------------------------------------------------
         !>calculate micro slope of Maxwellian distribution
         !>@param[in] prim        :primary variables
         !>@param[in] sw          :slope of W
@@ -641,12 +563,9 @@ module solver
         subroutine evolution()
             integer :: i
 
-            call calc_flux_boundary(bc_W,vface(ixmin),ctr(ixmin),RN) !RN means no frame rotation
-            call calc_flux_boundary(bc_E,vface(ixmax+1),ctr(ixmax),RY) !RY means with frame rotation
-
             !$omp parallel
             !$omp do
-            do i=ixmin+1,ixmax
+            do i=ixmin,ixmax+1 !with ghost cell
                 call calc_flux(ctr(i-1),vface(i),ctr(i))
             end do
             !$omp end do nowait
@@ -788,58 +707,60 @@ module io
             real(kind=RKD) :: init_gas(3) !initial condition
             real(kind=RKD) :: alpha_ref,omega_ref
             real(kind=RKD) :: kn !Knudsen number in reference state
+            real(kind=RKD) :: Ma !Mach number in front of shock
             real(kind=RKD) :: xlength !length of computational domain
             real(kind=RKD) :: umin !smallest and largest discrete velocity (for newton-cotes)
-            integer :: xnum !number of cells
+            real(kind=RKD) :: xscale !cell size/mean free path
 
             !control
-            cfl = 0.8 !CFL number
+            cfl = 0.95 !CFL number
             eps = 1.0E-5 !convergence criteria
-            method_interp = FIRST_ORDER !first order interpolation. Set to 1 or SECOND_ORDER for second order interpolation
+            method_interp = SECOND_ORDER !second order interpolation
             method_output = POINTS !output solution as point (node) value
 
             !gas
             ck = 2 !internal degree of freedom
             gam = get_gamma(ck) !ratio of specific heat
             pr = 2.0/3.0 !Prandtl number
-            omega = 0.81 !temperature dependence index in VHS model
-            kn = 0.075 !Knudsen number in reference state
+            omega = 0.5 !temperature dependence index in VHS model
+            kn = 1.0 !Knudsen number in reference state
             alpha_ref = 1.0 !coefficient in HS model
             omega_ref = 0.5 !coefficient in HS model
             mu_ref = get_mu(kn,alpha_ref,omega_ref) !reference viscosity coefficient
 
             !velocity space
-            unum = 61
-            umin = -4.0
-            umax = 4.0
+            unum = 200
+            umin = 1.0-10.0
+            umax = 1.0+10.0
 
             !geometry
-            xlength = 1.0
-            xnum = 45
+            xlength = 50.0
+            xscale = 0.01
 
-            !initial condition (density,u-velocity,lambda=1/temperature)
-            init_gas = [1.0, 0.0, 1.0]
+            !Mach number
+            Ma = 1.2
 
-            !set boundary condition (density,u-velocity,lambda)
-            bc_W = [1.0, 0.0, 1.0] !west
-            bc_E = [1.0, 0.0, 1.0] !east
-
-            call init_geometry(xlength,xnum) !initialize the geometry
+            call init_geometry(xlength,xscale) !initialize the geometry
             call init_velocity_newton(unum,umin,umax) !initialize discrete velocity space
             call init_allocation() !allocate arrays
-            call init_flow_field(init_gas) !set the initial condition
+            call init_flow_field(Ma) !set the initial condition
         end subroutine init
 
         !--------------------------------------------------
         !>initialize the geometry
-        !>@param[in] xnum            :number of cells
-        !>@param[in] xlength         :domain length
+        !>@param[inout] xlength :domain length
+        !>@param[in]    xscale  :cell size/mean free path
         !--------------------------------------------------
-        subroutine init_geometry(xlength,xnum)
-            real(kind=RKD),intent(in) :: xlength
-            integer,intent(in) :: xnum
+        subroutine init_geometry(xlength,xscale)
+            real(kind=RKD),intent(inout) :: xlength
+            real(kind=RKD),intent(in) :: xscale
+            real(kind=RKD) :: xnum !number of cells
             real(kind=RKD) :: dx !cell length
             integer :: i
+
+            !adjust values
+            xnum = xlength/xscale
+            xlength = xnum*xscale
 
             !cell index range
             ixmin = 1
@@ -849,18 +770,20 @@ module io
             ngrid = (ixmax-ixmin+1)
 
             !allocation
-            allocate(ctr(ixmin:ixmax)) !cell center
+            allocate(ctr(ixmin-1:ixmax+1)) !cell center (with ghost cell)
             allocate(vface(ixmin:ixmax+1)) !vertical and horizontal cell interface
             allocate(geometry(ixmin:ixmax+1)) !x coordinates (nodal value)
 
             !cell length and area
             dx = xlength/(ixmax-ixmin+1)
 
-            forall(i=ixmin:ixmax+1) !x coordinates (node value)
+            !x coordinates (node value)
+            forall(i=ixmin:ixmax+1) 
                 geometry(i) = (i-1)*dx
             end forall
 
-            forall(i=ixmin:ixmax) !cell center
+            !cell center (with ghost cell)
+            forall(i=ixmin-1:ixmax+1) 
                 ctr(i)%x = (i-0.5)*dx
                 ctr(i)%length = dx
             end forall
@@ -926,8 +849,8 @@ module io
         subroutine init_allocation()
             integer :: i
 
-            !cell center
-            do i=ixmin,ixmax
+            !cell center (with ghost cell)
+            do i=ixmin-1,ixmax+1
                 allocate(ctr(i)%h(unum))
                 allocate(ctr(i)%b(unum))
                 allocate(ctr(i)%sh(unum))
@@ -943,32 +866,55 @@ module io
 
         !--------------------------------------------------
         !>set the initial condition
-        !>@param[in] init_gas :initial condition
+        !>@param[in] Ma_L :Mach number in front of shock
         !--------------------------------------------------
-        subroutine init_flow_field(init_gas)
-            real(kind=RKD),intent(in) :: init_gas(3)
-            real(kind=RKD),allocatable,dimension(:) :: H,B !reduced Maxwellian distribution functions
-            real(kind=RKD) :: w(3) !conservative variables
+        subroutine init_flow_field(Ma_L)
+            real(kind=RKD),intent(in) :: Ma_L
+            real(kind=RKD) :: Ma_R !Mach number after shock
+            real(kind=RKD) :: ratio_T !T2/T1
+            real(kind=RKD) :: prim_L(3), prim_R(3) !primary variables before and after shock
+            real(kind=RKD) :: w_L(3), w_R(3) !conservative variables before and after shock
+            real(kind=RKD),allocatable,dimension(:) :: H_L,B_L !distribution function before shock
+            real(kind=RKD),allocatable,dimension(:) :: H_R,B_R !distribution function before shock
             integer :: i
 
-            !allocate array
-            allocate(H(unum))
-            allocate(B(unum))
+            !allocation
+            allocate(H_L(unum))
+            allocate(B_L(unum))
+            allocate(H_R(unum))
+            allocate(B_R(unum))
 
-            !convert primary variables to conservative variables
-            w = get_conserved(init_gas)
+            !upstream condition (before shock)
+            prim_L(1) = 1.0 !density
+            prim_L(2) = Ma_L*sqrt(gam/2.0) !velocity
+            prim_L(3) = 1.0 !lambda=1/temperature
 
-            !obtain discretized Maxwellian distribution H and B
-            call discrete_maxwell(H,B,init_gas)
+            !downstream condition (after shock)
+            Ma_R = sqrt((Ma_L**2*(gam-1)+2)/(2*gam*Ma_L**2-(gam-1)))
+            ratio_T = (1+(gam-1)/2*Ma_L**2)*(2*gam/(gam-1)*Ma_L**2-1)/(Ma_L**2*(2*gam/(gam-1)+(gam-1)/2))
 
-            !initial condition
-            forall(i=ixmin:ixmax)
-                ctr(i)%w = w
-                ctr(i)%h = H
-                ctr(i)%b = B
-                ctr(i)%sh = 0.0
-                ctr(i)%sb = 0.0
+            prim_R(1) = prim_L(1)*(gam+1)*Ma_L**2/((gam-1)*Ma_L**2+2)
+            prim_R(2) = Ma_R*sqrt(gam/2.0)*sqrt(ratio_T)
+            prim_R(3) = prim_L(3)/ratio_T
+
+            !conservative variables and distribution function
+            w_L = get_conserved(prim_L)
+            w_R = get_conserved(prim_R)
+            call discrete_maxwell(H_L,B_L,prim_L)
+            call discrete_maxwell(H_R,B_R,prim_R)
+
+            !initialize field (with ghost cell)
+            forall(i=ixmin-1:(ixmin+ixmax)/2)
+                ctr(i)%w = w_L
+                ctr(i)%h = H_L
+                ctr(i)%b = B_L
             end forall
+            
+            forall(i=(ixmin+ixmax)/2+1:ixmax+1)
+                ctr(i)%w = w_R
+                ctr(i)%h = H_R
+                ctr(i)%b = B_R
+            end forall 
         end subroutine init_flow_field
 
         !--------------------------------------------------
@@ -1003,13 +949,13 @@ module io
                     write(RSTFILE,*) "ZONE  I = ",ixmax-ixmin+1,", DATAPACKING=BLOCK"
 
                     !write geometry (cell centered value)
-                    write(RSTFILE,"(6(ES23.16,2X))") ctr%x
+                    write(RSTFILE,"(6(ES23.16,2X))") ctr(ixmin:ixmax)%x
             end select
 
 
             !write solution (cell-centered)
             do i=1,5
-                write(RSTFILE,"(6(ES23.16,2X))") ctr%primary(i)
+                write(RSTFILE,"(6(ES23.16,2X))") ctr(ixmin:ixmax)%primary(i)
             end do
     
             !close file
@@ -1047,7 +993,8 @@ program main
         call update() !update cell averaged value
 
         !check if exit
-        if (all(res<eps)) exit
+        !if (all(res<eps)) exit
+        if (sim_time>=5.0) exit
 
         !write iteration situation every 10 iterations
         if (mod(iter,10)==0) then
