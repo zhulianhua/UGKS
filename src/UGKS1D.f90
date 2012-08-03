@@ -35,8 +35,8 @@ module global_data
     real(kind=RKD) :: cfl !global CFL number
     real(kind=RKD) :: dt !global time step
     real(kind=RKD) :: res(3) !residual
-    real(kind=RKD) :: eps !convergence criteria
     real(kind=RKD) :: sim_time !current simulation time
+    real(kind=RKD) :: max_time !maximum simulation time
     character(len=255),parameter :: HSTFILENAME = "shock.hst" !convergence history file name
     character(len=255),parameter :: RSTFILENAME = "shock.rst" !result file name
     integer :: iter !iteration
@@ -75,7 +75,7 @@ module global_data
         real(kind=RKD) :: length !length
         !flow field
         real(kind=RKD) :: w(3) !density, x-momentum,total energy
-        real(kind=RKD) :: primary(5) !density,u-velocity,pressure,temperature,heat flux
+        real(kind=RKD) :: primary(6) !density,u-velocity,pressure,temperature,heat flux,stress
         real(kind=RKD),allocatable,dimension(:) :: h,b !distribution function
         real(kind=RKD),allocatable,dimension(:) :: sh,sb !slope of distribution function
     end type cell_center
@@ -118,8 +118,8 @@ module tools
     contains
         !--------------------------------------------------
         !>obtain discretized Maxwellian distribution
-        !>@param[out] h,b   :distribution function
-        !>@param[in]  prim  :primary variables
+        !>@param[out] h,b  :distribution function
+        !>@param[in]  prim :primary variables
         !--------------------------------------------------
         subroutine discrete_maxwell(h,b,prim)
             real(kind=RKD),dimension(:),intent(out) :: h,b
@@ -241,6 +241,21 @@ module tools
         end function get_pressure
 
         !--------------------------------------------------
+        !>get stress
+        !>@param[in] h,b        :distribution function
+        !>@param[in] prim       :primary variables
+        !>@param[in] pressure   :pressure
+        !>@return    get_stress :stress
+        !--------------------------------------------------
+        function get_stress(h,b,prim,pressure)
+            real(kind=RKD),dimension(:),intent(in) :: h,b
+            real(kind=RKD),intent(in) :: prim(3),pressure
+            real(kind=RKD) :: get_stress !stress
+
+            get_stress = sum(weight*(uspace-prim(2))**2*h)-pressure
+        end function get_stress
+
+        !--------------------------------------------------
         !>get the nondimensionalized viscosity coefficient
         !>@param[in] kn          :Knudsen number
         !>@param[in] alpha,omega :index related to HS/VHS/VSS model
@@ -284,7 +299,7 @@ module flux
             real(kind=RKD) :: qf !heat flux in normal and tangential direction
             real(kind=RKD) :: sw(3) !slope of W
             real(kind=RKD) :: aL(3),aR(3),aT(3) !micro slope of Maxwellian distribution, left,right and time.
-            real(kind=RKD) :: Mu(0:MNUM),Mu_L(0:MNUM),Mu_R(0:MNUM),Mxi(0:2) !<u^n>,<u^n>_{>0},<u^n>_{<0},<v^m>,<\xi^l>
+            real(kind=RKD) :: Mu(0:MNUM),Mu_L(0:MNUM),Mu_R(0:MNUM),Mxi(0:2) !<u^n>,<u^n>_{>0},<u^n>_{<0},<\xi^l>
             real(kind=RKD) :: Mau_0(3),Mau_L(3),Mau_R(3),Mau_T(3) !<u\psi>,<aL*u^n*\psi>,<aR*u^n*\psi>,<A*u*\psi>
             real(kind=RKD) :: tau !collision time
             real(kind=RKD) :: Mt(5) !some time integration terms
@@ -343,7 +358,7 @@ module flux
             !--------------------------------------------------
             !calculate time slope of W and A
             !--------------------------------------------------
-            !<u^n>,<v^m>,<\xi^l>,<u^n>_{>0},<u^n>_{<0}
+            !<u^n>,<\xi^l>,<u^n>_{>0},<u^n>_{<0}
             call calc_moment_u(prim,Mu,Mxi,Mu_L,Mu_R) 
 
             Mau_L = moment_au(aL,Mu_L,Mxi,1) !<aL*u*\psi>_{>0}
@@ -456,11 +471,11 @@ module flux
 
         !--------------------------------------------------
         !>calculate <u^\alpha*\xi^\delta*\psi>
-        !>@param[in] Mu         :<u^\alpha>
-        !>@param[in] Mxi        :<\xi^l>
-        !>@param[in] alpha      :exponential index of u
-        !>@param[in] delta      :exponential index of \xi
-        !>@return    moment_uv  :moment of <u^\alpha*\xi^\delta*\psi>
+        !>@param[in] Mu        :<u^\alpha>
+        !>@param[in] Mxi       :<\xi^l>
+        !>@param[in] alpha     :exponential index of u
+        !>@param[in] delta     :exponential index of \xi
+        !>@return    moment_uv :moment of <u^\alpha*\xi^\delta*\psi>
         !--------------------------------------------------
         function moment_uv(Mu,Mxi,alpha,delta)
             real(kind=RKD),intent(in) :: Mu(0:MNUM),Mxi(0:2)
@@ -474,11 +489,11 @@ module flux
 
         !--------------------------------------------------
         !>calculate <a*u^\alpha*\psi>
-        !>@param[in] a          :micro slope of Maxwellian
-        !>@param[in] Mu         :<u^\alpha>
-        !>@param[in] Mxi        :<\xi^l>
-        !>@param[in] alpha      :exponential index of u
-        !>@return    moment_au  :moment of <a*u^\alpha*\psi>
+        !>@param[in] a         :micro slope of Maxwellian
+        !>@param[in] Mu        :<u^\alpha>
+        !>@param[in] Mxi       :<\xi^l>
+        !>@param[in] alpha     :exponential index of u
+        !>@return    moment_au :moment of <a*u^\alpha*\psi>
         !--------------------------------------------------
         function moment_au(a,Mu,Mxi,alpha)
             real(kind=RKD),intent(in) :: a(3)
@@ -714,9 +729,9 @@ module io
 
             !control
             cfl = 0.95 !CFL number
-            eps = 1.0E-5 !convergence criteria
+            max_time = 250 !maximum simulation time
             method_interp = SECOND_ORDER !second order interpolation
-            method_output = POINTS !output solution as point (node) value
+            method_output = CENTER !output solution as point (node) value
 
             !gas
             ck = 2 !internal degree of freedom
@@ -729,13 +744,13 @@ module io
             mu_ref = get_mu(kn,alpha_ref,omega_ref) !reference viscosity coefficient
 
             !velocity space
-            unum = 200
-            umin = 1.0-10.0
-            umax = 1.0+10.0
+            unum = 60
+            umin = 1.0-4.0
+            umax = 1.0+4.0
 
             !geometry
             xlength = 50.0
-            xscale = 0.01
+            xscale = 1.0
 
             !Mach number
             Ma = 1.2
@@ -931,17 +946,18 @@ module io
                 ctr(i)%primary(3) = get_pressure(ctr(i)%h,ctr(i)%b,prim) !pressure
                 ctr(i)%primary(4) = 2.0*ctr(i)%primary(3)/ctr(i)%primary(1) !temperature
                 ctr(i)%primary(5) = get_heat_flux(ctr(i)%h,ctr(i)%b,prim) !heat flux
+                ctr(i)%primary(6) = get_stress(ctr(i)%h,ctr(i)%b,prim,ctr(i)%primary(3)) !stress
             end do
 
             !open result file
             open(unit=RSTFILE,file=RSTFILENAME,status="replace",action="write")
 
             !write header
-            write(RSTFILE,*) "VARIABLES = X, RHO, U, P, T, QX"
+            write(RSTFILE,*) "VARIABLES = X, RHO, U, P, T, QX, TAU"
 
             select case(method_output)
                 case(CENTER)
-                    write(RSTFILE,*) "ZONE  I = ",ixmax-ixmin+2,", DATAPACKING=BLOCK, VARLOCATION=([2-6]=CELLCENTERED)"
+                    write(RSTFILE,*) "ZONE  I = ",ixmax-ixmin+2,", DATAPACKING=BLOCK, VARLOCATION=([2-7]=CELLCENTERED)"
 
                     !write geometry (node value)
                     write(RSTFILE,"(6(ES23.16,2X))") geometry
@@ -954,7 +970,7 @@ module io
 
 
             !write solution (cell-centered)
-            do i=1,5
+            do i=1,6
                 write(RSTFILE,"(6(ES23.16,2X))") ctr(ixmin:ixmax)%primary(i)
             end do
     
@@ -993,8 +1009,7 @@ program main
         call update() !update cell averaged value
 
         !check if exit
-        !if (all(res<eps)) exit
-        if (sim_time>=5.0) exit
+        if (sim_time>=max_time) exit
 
         !write iteration situation every 10 iterations
         if (mod(iter,10)==0) then
