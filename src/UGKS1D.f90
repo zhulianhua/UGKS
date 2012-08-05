@@ -706,8 +706,10 @@ module io
 
             !control
             cfl = 0.95 !CFL number
-            out_time = 1000 !output time interval
-            method_desist = NONSTOP !never stop iteration and output at an interval specified by out_time
+            !out_time = 100 !output time interval
+            !method_desist = NONSTOP !never stop iteration and output at an interval specified by out_time
+            method_desist = MAXTIME
+            max_time = 100
 
             !gas
             ck = 2 !internal degree of freedom
@@ -925,7 +927,7 @@ module io
             !open result file and write header
             open(unit=RSTFILE,file=RSTFILENAME,status="replace",action="write")
             write(RSTFILE,*) "VARIABLES = X, RHO, U, P, T, QX, TAU"
-            write(RSTFILE,*) "ZONE  T=Time: ",sim_time,", I = ",ixmax-ixmin+1,", DATAPACKING=BLOCK"
+            write(RSTFILE,*) 'ZONE  T="Time: ',sim_time,'", I = ',ixmax-ixmin+1,', DATAPACKING=BLOCK'
 
             !write geometry (cell-centered)
             write(RSTFILE,"(6(ES23.16,2X))") ctr(ixmin:ixmax)%x
