@@ -34,14 +34,13 @@ module global_data
     real(kind=RKD),parameter :: UP = 1.0 !used in sign() function
     real(kind=RKD) :: cfl !global CFL number
     real(kind=RKD) :: dt !global time step
-    real(kind=RKD) :: res(3) !residual
     real(kind=RKD) :: sim_time !current simulation time
     real(kind=RKD) :: max_time !maximum simulation time
-    character(len=255),parameter :: HSTFILENAME = "shock.hst" !convergence history file name
+    real(kind=RKD) :: out_time !output time interval
+    character(len=255),parameter :: HSTFILENAME = "shock.hst" !history file name
     character(len=255),parameter :: RSTFILENAME = "shock.rst" !result file name
     integer :: iter !iteration
-    integer :: method_interp !interpolation method
-    integer :: method_output !output as cell centered or point value
+    integer :: method_desist !method to output the result
 
     !--------------------------------------------------
     !gas properties
@@ -58,12 +57,9 @@ module global_data
     !I/O
     integer,parameter :: HSTFILE = 20 !history file ID
     integer,parameter :: RSTFILE = 21 !result file ID
-    !interpolation
-    integer,parameter :: FIRST_ORDER = 0 !first order interpolation
-    integer,parameter :: SECOND_ORDER = 1 !second order interpolation
-    !output
-    integer,parameter :: CENTER = 1 !output solution as cell centered value
-    integer,parameter :: POINTS = 2 !output solution as point value
+    !stop method
+    integer,parameter :: MAXTIME = 1 !stop iteration when maximum time is reached
+    integer,parameter :: NONSTOP = 2 !never stop iteration. output at an specified interval
 
     !--------------------------------------------------
     !basic derived type
@@ -94,8 +90,6 @@ module global_data
     !  (i)|      (i)     |(i+1)
     !     ----------------
     integer :: ixmin,ixmax !index range
-    integer :: ngrid !number of total grids
-    real(kind=RKD),allocatable,dimension(:) :: geometry !geometry (node coordinates)
     type(cell_center),allocatable,dimension(:) :: ctr !cell centers
     type(cell_interface),allocatable,dimension(:) :: vface !vertical interfaces
     real(kind=RKD) :: bc_W(3),bc_E(3) !boundary conditions at west and east
@@ -557,9 +551,6 @@ module solver
         subroutine interpolation()
             integer :: i
 
-            !no interpolation if first order (already set to zero slope when initializing)
-            if (method_interp==FIRST_ORDER) return 
-
             call interp_boundary(ctr(ixmin),ctr(ixmin),ctr(ixmin+1))
             call interp_boundary(ctr(ixmax),ctr(ixmax-1),ctr(ixmax))
 
@@ -597,7 +588,6 @@ module solver
             real(kind=RKD) :: w_old(3) !conservative variables at t^n
             real(kind=RKD) :: prim_old(3),prim(3) !primary variables at t^n and t^{n+1}
             real(kind=RKD) :: tau_old,tau !collision time and t^n and t^{n+1}
-            real(kind=RKD) :: sum_res(3),sum_avg(3)
             real(kind=RKD) :: qf
             integer :: i
 
@@ -610,10 +600,6 @@ module solver
             allocate(B_plus(unum))
 
             !set initial value
-            res = 0.0
-            sum_res = 0.0
-            sum_avg = 0.0
-
             do i=ixmin,ixmax
                 !--------------------------------------------------
                 !store W^n and calculate H^n,B^n,\tau^n
@@ -632,12 +618,6 @@ module solver
                 prim = get_primary(ctr(i)%w)
                 call discrete_maxwell(H,B,prim)
                 tau = get_tau(prim)
-
-                !--------------------------------------------------
-                !record residual
-                !--------------------------------------------------
-                sum_res = sum_res+(w_old-ctr(i)%w)**2
-                sum_avg = sum_avg+abs(ctr(i)%w)
 
                 !--------------------------------------------------
                 !Shakhov part
@@ -663,9 +643,6 @@ module solver
                 ctr(i)%b = (ctr(i)%b+(vface(i)%flux_b-vface(i+1)%flux_b)/ctr(i)%length+&
                                   0.5*dt*(B/tau+(B_old-ctr(i)%b)/tau_old))/(1.0+0.5*dt/tau)
             end do
-
-            !final residual
-            res = sqrt(ngrid*sum_res)/(sum_avg+SMV)
         end subroutine update
 
         !--------------------------------------------------
@@ -729,31 +706,30 @@ module io
 
             !control
             cfl = 0.95 !CFL number
-            max_time = 250 !maximum simulation time
-            method_interp = SECOND_ORDER !second order interpolation
-            method_output = CENTER !output solution as point (node) value
+            out_time = 1000 !output time interval
+            method_desist = NONSTOP !never stop iteration and output at an interval specified by out_time
 
             !gas
             ck = 2 !internal degree of freedom
             gam = get_gamma(ck) !ratio of specific heat
             pr = 2.0/3.0 !Prandtl number
-            omega = 0.5 !temperature dependence index in VHS model
+            omega = 0.72 !temperature dependence index in VHS model
             kn = 1.0 !Knudsen number in reference state
             alpha_ref = 1.0 !coefficient in HS model
             omega_ref = 0.5 !coefficient in HS model
             mu_ref = get_mu(kn,alpha_ref,omega_ref) !reference viscosity coefficient
 
             !velocity space
-            unum = 60
-            umin = 1.0-4.0
-            umax = 1.0+4.0
+            unum = 200
+            umin = -15.0
+            umax = +15.0
 
             !geometry
-            xlength = 50.0
+            xlength = 200.0
             xscale = 1.0
 
             !Mach number
-            Ma = 1.2
+            Ma = 8.0
 
             call init_geometry(xlength,xscale) !initialize the geometry
             call init_velocity_newton(unum,umin,umax) !initialize discrete velocity space
@@ -781,21 +757,12 @@ module io
             ixmin = 1
             ixmax = xnum
 
-            !total number of cell
-            ngrid = (ixmax-ixmin+1)
-
             !allocation
             allocate(ctr(ixmin-1:ixmax+1)) !cell center (with ghost cell)
             allocate(vface(ixmin:ixmax+1)) !vertical and horizontal cell interface
-            allocate(geometry(ixmin:ixmax+1)) !x coordinates (nodal value)
 
             !cell length and area
             dx = xlength/(ixmax-ixmin+1)
-
-            !x coordinates (node value)
-            forall(i=ixmin:ixmax+1) 
-                geometry(i) = (i-1)*dx
-            end forall
 
             !cell center (with ghost cell)
             forall(i=ixmin-1:ixmax+1) 
@@ -930,6 +897,12 @@ module io
                 ctr(i)%h = H_R
                 ctr(i)%b = B_R
             end forall 
+
+            !initialize slope of distribution function at ghost cell
+            ctr(ixmin-1)%sh = 0.0
+            ctr(ixmin-1)%sb = 0.0
+            ctr(ixmax+1)%sh = 0.0
+            ctr(ixmax+1)%sb = 0.0
         end subroutine init_flow_field
 
         !--------------------------------------------------
@@ -949,25 +922,13 @@ module io
                 ctr(i)%primary(6) = get_stress(ctr(i)%h,ctr(i)%b,prim,ctr(i)%primary(3)) !stress
             end do
 
-            !open result file
+            !open result file and write header
             open(unit=RSTFILE,file=RSTFILENAME,status="replace",action="write")
-
-            !write header
             write(RSTFILE,*) "VARIABLES = X, RHO, U, P, T, QX, TAU"
+            write(RSTFILE,*) "ZONE  T=Time: ",sim_time,", I = ",ixmax-ixmin+1,", DATAPACKING=BLOCK"
 
-            select case(method_output)
-                case(CENTER)
-                    write(RSTFILE,*) "ZONE  I = ",ixmax-ixmin+2,", DATAPACKING=BLOCK, VARLOCATION=([2-7]=CELLCENTERED)"
-
-                    !write geometry (node value)
-                    write(RSTFILE,"(6(ES23.16,2X))") geometry
-                case(POINTS)
-                    write(RSTFILE,*) "ZONE  I = ",ixmax-ixmin+1,", DATAPACKING=BLOCK"
-
-                    !write geometry (cell centered value)
-                    write(RSTFILE,"(6(ES23.16,2X))") ctr(ixmin:ixmax)%x
-            end select
-
+            !write geometry (cell-centered)
+            write(RSTFILE,"(6(ES23.16,2X))") ctr(ixmin:ixmax)%x
 
             !write solution (cell-centered)
             do i=1,6
@@ -990,16 +951,19 @@ program main
     use io
     implicit none
 
+    integer :: counter !count output interval
+
     !initialization
     call init() 
 
     !set initial value
+    counter = 1 
     iter = 1 !number of iteration
     sim_time = 0.0 !simulation time
 
     !open file and write header
     open(unit=HSTFILE,file=HSTFILENAME,status="replace",action="write") !open history file
-    write(HSTFILE,*) "VARIABLES = iter, sim_time, dt, res_rho, res_ru, res_re" !write header
+    write(HSTFILE,*) "VARIABLES = iter, sim_time, dt" !write header
 
     !iteration
     do while(.true.)
@@ -1008,14 +972,19 @@ program main
         call evolution() !calculate flux across the interfaces
         call update() !update cell averaged value
 
-        !check if exit
-        if (sim_time>=max_time) exit
+        !check if output
+        if (method_desist==NONSTOP .and. sim_time>=out_time*counter) then
+            call output()
+            counter = counter+1
+        else if (method_desist==MAXTIME .and. sim_time>=max_time) then
+            call output()
+            exit
+        end if
 
         !write iteration situation every 10 iterations
         if (mod(iter,10)==0) then
             write(*,"(A18,I15,2E15.7)") "iter,sim_time,dt:",iter,sim_time,dt
-            write(*,"(A18,3E15.7)") "res:",res
-            write(HSTFILE,"(I15,5E15.7)") iter,sim_time,dt,res
+            write(HSTFILE,"(I15,2E15.7)") iter,sim_time,dt
         end if
 
         iter = iter+1
@@ -1024,9 +993,6 @@ program main
 
     !close history file
     close(HSTFILE)
-
-    !output solution
-    call output()
 end program main
 
 ! vim: set ft=fortran tw=0: 
