@@ -36,11 +36,10 @@ module global_data
     real(kind=RKD) :: dt !global time step
     real(kind=RKD) :: sim_time !current simulation time
     real(kind=RKD) :: max_time !maximum simulation time
-    real(kind=RKD) :: out_time !output time interval
-    character(len=255),parameter :: HSTFILENAME = "shock.hst" !history file name
-    character(len=255),parameter :: RSTFILENAME = "shock.rst" !result file name
+    character(len=9),parameter :: HSTFILENAME = "shock.hst" !history file name
+    character(len=9),parameter :: RSTFILENAME = "shock.rst" !result file name
     integer :: iter !iteration
-    integer :: method_desist !method to output the result
+    integer :: method_output !output the solution with normalized value or not
 
     !--------------------------------------------------
     !gas properties
@@ -57,9 +56,9 @@ module global_data
     !I/O
     integer,parameter :: HSTFILE = 20 !history file ID
     integer,parameter :: RSTFILE = 21 !result file ID
-    !stop method
-    integer,parameter :: MAXTIME = 1 !stop iteration when maximum time is reached
-    integer,parameter :: NONSTOP = 2 !never stop iteration. output at an specified interval
+    !output method
+    integer,parameter :: ORIGINAL = 0 !do not normalize the solution
+    integer,parameter :: NORMALIZE = 1 !normalize the solution
 
     !--------------------------------------------------
     !basic derived type
@@ -71,7 +70,7 @@ module global_data
         real(kind=RKD) :: length !length
         !flow field
         real(kind=RKD) :: w(3) !density, x-momentum,total energy
-        real(kind=RKD) :: primary(6) !density,u-velocity,pressure,temperature,heat flux,stress
+        real(kind=RKD) :: primary(2) !density,temperature
         real(kind=RKD),allocatable,dimension(:) :: h,b !distribution function
         real(kind=RKD),allocatable,dimension(:) :: sh,sb !slope of distribution function
     end type cell_center
@@ -92,7 +91,6 @@ module global_data
     integer :: ixmin,ixmax !index range
     type(cell_center),allocatable,dimension(:) :: ctr !cell centers
     type(cell_interface),allocatable,dimension(:) :: vface !vertical interfaces
-    real(kind=RKD) :: bc_W(3),bc_E(3) !boundary conditions at west and east
 
     !--------------------------------------------------
     !discrete velocity space
@@ -221,33 +219,18 @@ module tools
         end function get_heat_flux
 
         !--------------------------------------------------
-        !>get pressure
-        !>@param[in] h,b          :distribution function
-        !>@param[in] prim         :primary variables
-        !>@return    get_pressure :pressure
+        !>get temperature
+        !>@param[in] h,b             :distribution function
+        !>@param[in] prim            :primary variables
+        !>@return    get_temperature :temperature
         !--------------------------------------------------
-        function get_pressure(h,b,prim)
+        function get_temperature(h,b,prim)
             real(kind=RKD),dimension(:),intent(in) :: h,b
             real(kind=RKD),intent(in) :: prim(3)
-            real(kind=RKD) :: get_pressure !pressure
+            real(kind=RKD) :: get_temperature !pressure
 
-            get_pressure = (sum(weight*(uspace-prim(2))**2*h)+sum(weight*b))/(ck+1)
-        end function get_pressure
-
-        !--------------------------------------------------
-        !>get stress
-        !>@param[in] h,b        :distribution function
-        !>@param[in] prim       :primary variables
-        !>@param[in] pressure   :pressure
-        !>@return    get_stress :stress
-        !--------------------------------------------------
-        function get_stress(h,b,prim,pressure)
-            real(kind=RKD),dimension(:),intent(in) :: h,b
-            real(kind=RKD),intent(in) :: prim(3),pressure
-            real(kind=RKD) :: get_stress !stress
-
-            get_stress = sum(weight*(uspace-prim(2))**2*h)-pressure
-        end function get_stress
+            get_temperature = 2.0*(sum(weight*(uspace-prim(2))**2*h)+sum(weight*b))/(ck+1)/prim(1)
+        end function get_temperature
 
         !--------------------------------------------------
         !>get the nondimensionalized viscosity coefficient
@@ -697,7 +680,7 @@ module io
         !--------------------------------------------------
         subroutine init()
             real(kind=RKD) :: init_gas(3) !initial condition
-            real(kind=RKD) :: alpha_ref,omega_ref
+            real(kind=RKD) :: alpha_ref,omega_ref !molecule model coefficient in referece state
             real(kind=RKD) :: kn !Knudsen number in reference state
             real(kind=RKD) :: Ma !Mach number in front of shock
             real(kind=RKD) :: xlength !length of computational domain
@@ -706,10 +689,8 @@ module io
 
             !control
             cfl = 0.95 !CFL number
-            !out_time = 100 !output time interval
-            !method_desist = NONSTOP !never stop iteration and output at an interval specified by out_time
-            method_desist = MAXTIME
-            max_time = 100
+            max_time = 250 !output time interval
+            method_output = NORMALIZE !normalize the variables by (V-V1)/(V2-V1), where V1,V2 are upstream and downstream values
 
             !gas
             ck = 2 !internal degree of freedom
@@ -722,13 +703,13 @@ module io
             mu_ref = get_mu(kn,alpha_ref,omega_ref) !reference viscosity coefficient
 
             !velocity space
-            unum = 200
+            unum = 100
             umin = -15.0
             umax = +15.0
 
             !geometry
-            xlength = 200.0
-            xscale = 1.0
+            xlength = 50.0
+            xscale = 0.5
 
             !Mach number
             Ma = 8.0
@@ -911,29 +892,47 @@ module io
         !>write result
         !--------------------------------------------------
         subroutine output()
-            real(kind=RKD) :: prim(3) !primary variables
+            real(kind=RKD) :: rho_avg !average density
+            real(kind=RKD) :: xmid !location of average density
             integer :: i
 
-            !prepare solution
-            do i=ixmin,ixmax
-                prim = get_primary(ctr(i)%w) !primary variables
-                ctr(i)%primary(1:2) = prim(1:2) !density,u
-                ctr(i)%primary(3) = get_pressure(ctr(i)%h,ctr(i)%b,prim) !pressure
-                ctr(i)%primary(4) = 2.0*ctr(i)%primary(3)/ctr(i)%primary(1) !temperature
-                ctr(i)%primary(5) = get_heat_flux(ctr(i)%h,ctr(i)%b,prim) !heat flux
-                ctr(i)%primary(6) = get_stress(ctr(i)%h,ctr(i)%b,prim,ctr(i)%primary(3)) !stress
+            !--------------------------------------------------
+            !preparation
+            !--------------------------------------------------
+            !solution (with ghost cell)
+            do i=ixmin-1,ixmax+1
+                ctr(i)%primary(1) = ctr(i)%w(1) !density
+                ctr(i)%primary(2) = get_temperature(ctr(i)%h,ctr(i)%b,get_primary(ctr(i)%w)) !temperature
             end do
 
+            !find middle location - the location of average density
+            rho_avg = 0.5*(ctr(ixmin-1)%w(1)+ctr(ixmax+1)%w(1))
+
+            do i=ixmin,ixmax
+                if ((ctr(i)%w(1)-rho_avg)*(ctr(i+1)%w(1)-rho_avg)<=0) then
+                    xmid = ctr(i)%x+(ctr(i+1)%x-ctr(i)%x)/(ctr(i+1)%w(1)-ctr(i)%w(1))*(rho_avg-ctr(i)%w(1))
+                end if
+            end do
+
+            !normalization
+            if (method_output==NORMALIZE) then
+                ctr%primary(1) = (ctr%primary(1)-ctr(ixmin-1)%primary(1))/(ctr(ixmax+1)%primary(1)-ctr(ixmin-1)%primary(1))
+                ctr%primary(2) = (ctr%primary(2)-ctr(ixmin-1)%primary(2))/(ctr(ixmax+1)%primary(2)-ctr(ixmin-1)%primary(2))
+            end if
+
+            !--------------------------------------------------
+            !write to file
+            !--------------------------------------------------
             !open result file and write header
             open(unit=RSTFILE,file=RSTFILENAME,status="replace",action="write")
-            write(RSTFILE,*) "VARIABLES = X, RHO, U, P, T, QX, TAU"
+            write(RSTFILE,*) "VARIABLES = X, RHO, T"
             write(RSTFILE,*) 'ZONE  T="Time: ',sim_time,'", I = ',ixmax-ixmin+1,', DATAPACKING=BLOCK'
 
             !write geometry (cell-centered)
-            write(RSTFILE,"(6(ES23.16,2X))") ctr(ixmin:ixmax)%x
+            write(RSTFILE,"(6(ES23.16,2X))") ctr(ixmin:ixmax)%x-xmid
 
             !write solution (cell-centered)
-            do i=1,6
+            do i=1,2
                 write(RSTFILE,"(6(ES23.16,2X))") ctr(ixmin:ixmax)%primary(i)
             end do
     
@@ -953,13 +952,10 @@ program main
     use io
     implicit none
 
-    integer :: counter !count output interval
-
     !initialization
     call init() 
 
     !set initial value
-    counter = 1 
     iter = 1 !number of iteration
     sim_time = 0.0 !simulation time
 
@@ -975,13 +971,7 @@ program main
         call update() !update cell averaged value
 
         !check if output
-        if (method_desist==NONSTOP .and. sim_time>=out_time*counter) then
-            call output()
-            counter = counter+1
-        else if (method_desist==MAXTIME .and. sim_time>=max_time) then
-            call output()
-            exit
-        end if
+        if (sim_time>=max_time) exit
 
         !write iteration situation every 10 iterations
         if (mod(iter,10)==0) then
@@ -995,6 +985,9 @@ program main
 
     !close history file
     close(HSTFILE)
+
+    !output solution
+    call output()
 end program main
 
 ! vim: set ft=fortran tw=0: 
