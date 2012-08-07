@@ -32,6 +32,7 @@
 \tikzstyle{line} = [-latex]
 
 %define command
+\makeatletter
 \newcommand{\appxchapter}[2][\@empty]{
     \ifx\@empty#1
     \chapter{Appendix \Alph{chapter}: #2}
@@ -39,6 +40,7 @@
     \chapter[#1]{Appendix \Alph{chapter}: #2}
     \fi
 }
+\makeatletter
 
 \newcommand{\hi}[1]{
     \textbf{\textcolor{orange}{#1}}
