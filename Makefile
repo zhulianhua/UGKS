@@ -39,14 +39,14 @@ checkdir:
 
 #build manual
 manual: 
-	cd doc; latex  manual.tex
+	cd doc; latex  -shell-escape manual
 	cd doc; bibtex manual
-	cd doc; latex  manual
-	cd doc; latex  manual
+	cd doc; latex  -shell-escape manual
+	cd doc; latex  -shell-escape manual
 	cd doc; dvips  manual
 	cd doc; ps2pdf manual.ps
 
 #clean
 clean:
 	rm -f bin/*
-	cd doc; rm -f !(*.tex|*.bib|*.pdf)
+	cd doc; rm -f !(*.tex|*.bib|*.pdf|*.eps)
