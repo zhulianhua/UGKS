@@ -3,6 +3,7 @@ doc/*
 !doc/*.tex
 !doc/*.pdf
 !doc/*.bib
+!doc/*.eps
 *.vim
 tags
 bin

@@ -16,9 +16,13 @@
 \usepackage{fullpage}
 \usepackage{appendix}
 \usepackage{graphicx,subfigure}
+\usepackage{xcolor}
 
 %no indention
 \setlength\parindent{0pt}
+
+%define colors
+\definecolor{orange}{HTML}{FF7F00}
 
 %tikz package
 \usepackage{tikz}
@@ -28,7 +32,6 @@
 \tikzstyle{line} = [-latex]
 
 %define command
-\makeatletter
 \newcommand{\appxchapter}[2][\@empty]{
     \ifx\@empty#1
     \chapter{Appendix \Alph{chapter}: #2}
@@ -36,14 +39,16 @@
     \chapter[#1]{Appendix \Alph{chapter}: #2}
     \fi
 }
-\makeatother
+
+\newcommand{\hi}[1]{
+    \textbf{\textcolor{orange}{#1}}
+}
 
 %optionally load package for code highlighting
 \IfFileExists{minted.sty} {
     \usepackage{minted}
 }{
     \usepackage{listings}
-    \usepackage{color}
     \lstset{language=[90]Fortran,
         basicstyle=\ttfamily,
         keywordstyle=\color{red},
@@ -262,6 +267,7 @@ where $s_1=(h_{i,k}-h_{i-1,k})/(x_i-x_{i-1}), s_2=(h_{i+1,k}-h_{i,k})/(x_{i+1}-x
 The slope of $b$ is calculated in the same way.
 
 \section{Calculation of interface flux}
+\label{sec:inner_flux}
 Take the interface $x_{i+1/2}=0$ at $t^n=0$ as example.
 
 \subsection{The algorithm}
@@ -549,9 +555,9 @@ A makefile is provided to compile the program under Linux. If you are using any 
 
 The makefile can be used to compile the two codes, UGKS1D and UGKS2D, and also this manual. There are several requirements for the makefile to work.
 \begin{itemize}
-    \item Fortran Compiler: either ifort or gfortran, supporting Fortran 2003
+    \item Fortran Compiler: either \hi{ifort} or \hi{gfortran}, supporting Fortran 2003
     \item Bash shell
-    \item Latex: only for compilation of the manual. It requires hyperref, parskip, amsmath, amssymb, fullpage, appendix, graphicx, subfigure, listings or minted packages, and also bibtex, dvips and ps2pdf.
+    \item Latex: only for compilation of the manual. It requires \hi{hyperref}, \hi{parskip}, \hi{amsmath}, \hi{amssymb}, \hi{fullpage}, \hi{appendix}, \hi{graphicx}, \hi{subfigure}, \hi{xcolor}, \hi{listings} or \hi{minted} packages, and also \hi{bibtex}, \hi{dvips} and \hi{ps2pdf}.
 \end{itemize}
 
 By default, the make command will compile both UGKS1D and UGKS2D with openmp and ifort. This behavior can be changed by specifying the target and passing parameters.
@@ -605,12 +611,53 @@ This program uses \href{http://git-scm.com/}{GIT} for version control, and the s
 \end{minted}
 
 \section{UGKS1D Code}
-\subsection{Shock-structure problem}
-\subsection{Other information}
+Once the flow condition before the normal shock is known (upstream), the flow variables after the shock (downstream) can be calculated by normal shock relation,
+\begin{equation}
+    \label{eq:normal_shock}
+    \begin{aligned}
+        M_2 &= \sqrt{\frac{M_1^2(\gamma-1)+2}{2\gamma M_1^2-(\gamma-1)}}\\
+        \frac{\rho_2}{\rho_1} &= \frac{(\gamma+1)M_1^2}{(\gamma-1)M_1^2+2}\\
+        \frac{T_2}{T_1} &= \frac{(1+\frac{\gamma-1}{2}M_1^2)(\frac{2\gamma}{\gamma-1}M_1^2-1)}{M_1^2(\frac{2\gamma}{\gamma-1}+\frac{\gamma-1}{2})}
+    \end{aligned}
+\end{equation}
+where $M_1,\rho_1,T_1$ are upstream Mach number, density and temperature. $M_2,\rho_2,T_2$ are downstream Mach number, density and temperature.
+
+For shock structure calculation, the upstream and downstream conditions are specified at the two boundaries (via ghost cell). And the flux across the interfaces are calculated through the same method described in section \ref{sec:inner_flux}.
+
+In the UGKS1D code, the reference state is,
+$$L_\infty=l_{mfp,1},\quad T_\infty=T_1,\quad \rho_\infty = \rho_1$$
+where $l_{mfp,1}$ is the upstream mean free path.
+
+There are several important options in the code,
+\begin{itemize}
+    \item \textbf{method\_output}: the method to output the solution. If set to \hi{ORIGINAL}, the original nondimensionalized values will be written to the result file. If set to \hi{NORMALIZE}, the density will be normalized by $\rho = (\rho-\rho_1)/(\rho_2-\rho_1)$ and the temperature is also normalized by the same way
+    \item \textbf{mu\_ref}: the reference viscosity coefficient $\mu_\infty$. Can be specified directly or calculated through the provided function \hi{get\_mu}. This function calculate the viscosity coefficient through
+        $$\mu_\infty = \frac{5(\alpha+1)(\alpha+2)\sqrt{\pi}}{4\alpha(5-2\omega)(7-2\omega)}{\rm Kn}_\infty$$
+        where $\alpha,\omega$ are coefficients related to molecule model. 
+\end{itemize}
+
+The default settings in the code is for Argon shock structure calculation at ${\rm Ma}=8.0$, see \cite{Xu2011}
+\begin{itemize}
+    \item Argon gas with Prandlt number $\Pr=2.0/3.0$ and variable hard-sphere model $\omega=0.72$
+    \item Mach number 8.0
+    \item Newton-Cotes integration with 100 velocity points ranges from -15 to 15.
+    \item Computation domain is 50 times of the upstream mean free path
+    \item Cell size is half of the upstream mean free path
+    \item Output solution at $t=250$
+\end{itemize}
+
+Figure. \ref{pic:shock_solution} shows the comparision of the simulated density with the experimental measurements \cite{Alsmeyer1976} and also temperature profile .
+
+\begin{figure}[htb!]
+    \centering
+    \includegraphics[width=7cm,height=6.5cm]{shock_Ma8.eps}
+    \caption{Argon shock structure at ${\rm Ma}=8.0$.}
+    \label{pic:shock_solution}
+\end{figure}
 
 \section{UGKS2D Code}
 \subsection{Differences with 1D}
-For 2D problem, many expressions need to be slightly changed. For example, the Maxwellian distribution function becomes
+For 2D problem, many expressions need to be slightly changed. For example,
 $$g=\rho\left(\frac{\lambda}{\pi}\right)^{\frac{K+2}{2}}e^{-\lambda((u-U)^2+(v-V)^2+\xi^2)}$$
 where $v$ is particle velocity in y direction, $V$ is macroscopic velocity in y direction. 
 
@@ -620,7 +667,7 @@ $$\gamma=\frac{K+4}{K+2}$$
 The reduced Maxwellian distribution becomes ($B$ is not changed)
 $$H=\int_{-\infty}^{\infty}gd\xi=\rho\left(\frac{\lambda}{\pi}\right)e^{-\lambda((u-U)^2+(v-V)^2)}$$
 
-The collision invariants are $$\psi=(1,u,v,1/2(u^2+v^2+\xi^2))^T$$. And the expressions for macroscopic variables are correspondingly changed. For example, the nondimensionalized pressure is calculated via
+The collision invariants are $\psi=(1,u,v,1/2(u^2+v^2+\xi^2))^T$. And the expressions for macroscopic variables are correspondingly changed. For example, the nondimensionalized pressure is calculated via
 $$\frac{K+2}{2}p=\int((u-U)^2+(v-V)^2)hdu+\int bdu$$
 
 When calculating the flux, the slopes related to Maxwellian becomes
@@ -636,7 +683,7 @@ $$
 $$
 
 \subsection{Lid-driven cavity problem}
-The test case included in UGKS2D code is Lid-driven cavity problem. The argon gas is enclosed by four walls to form a rectangular shape. The upper wall is moving in tangential direction with velocity $U_W$, other walls are stationary. All walls are kept at a constant temperature $T_W$, and full accommodation is assumed. The gas is initially at rest with the same temperature as the wall.  Figure. \ref{pic:cavity} shows the schematic of the problem.
+The test case included in UGKS2D code is Lid-driven cavity problem\cite{Huang2012}. The argon gas is enclosed by four walls to form a rectangular shape. The upper wall is moving in tangential direction with velocity $U_W$, other walls are stationary. All walls are kept at a constant temperature $T_W$, and full accommodation is assumed. The gas is initially at rest with the same temperature as the wall.  Figure. \ref{pic:cavity} shows the schematic of the problem.
 
 \begin{figure}[htb!]
     \centering
@@ -657,36 +704,35 @@ In the code, the default test case is for $T_W = 273K, U_W=50m/s, {\rm Kn} = l_{
 Choose the initial condition as reference state, the settings are
 \begin{itemize}
     \item Second order interpolation
-    \item VHS model for collision time
-    \item HS model for reference state
+    \item VHS model for collision time and HS model for reference state
     \item Prandtl number $\Pr=2.0/3.0$, Knudsen number ${\rm Kn}_\infty=0.075$ (at reference state)
     \item $T_W=1, U_W=0.15$
     \item $L=1$ with 45x45 grids
     \item Gaussian quadrature with 28x28 velocity points
 \end{itemize}
 
-Figure. \ref{pic:cavity_solution} shows the result for the above setup.
+Figure. \ref{pic:cavity_solution} shows the result for the above setup, and compared with the DSMC solution\cite{John2011}.
 
-\begin{figure}
+\begin{figure}[htb!]
     \centering
     \subfigure[Temperature contour]{
-        \includegraphics[width=7cm,height=6.8cm]{temperature.eps}
+        \includegraphics[width=7cm,height=6.5cm]{temperature.eps}
     }
     \subfigure[Heat flux]{
-        \includegraphics[width=7cm,height=6.8cm]{heatflux.eps}
+        \includegraphics[width=7cm,height=6.5cm]{heatflux.eps}
     }
     \subfigure[U-velocity along vertical center line]{
-        \includegraphics[width=7cm,height=6.8cm]{vline.eps}
+        \includegraphics[width=7cm,height=6.5cm]{vline.eps}
     }
     \subfigure[V-velocity along horizontal center line]{
-        \includegraphics[width=7cm,height=6.8cm]{hline.eps}
+        \includegraphics[width=7cm,height=6.5cm]{hline.eps}
     }
-    \caption{Cavity flow at ${\rm Kn}=0.075$. (a) temperature contour. The black lines are from DSMC, the white lines and background contour are from UGKS; (b) heat flux lines; (c) x direction velocity along the vertical center line (normalized by wall velocity); (d) y direction velocity along the horizontal center line (normalized by wall velocity).}
+    \caption{Cavity flow at ${\rm Kn}=0.075$. In the temperature contour, the black lines are from DSMC, the white lines and background contour are from UGKS}
     \label{pic:cavity_solution}
 \end{figure}
 
 \subsection{Other information}
-The Gaussian quadrature used in the code is from Table IIa of \cite{Shizgal1981}, which is better than Gaussian-Hermite quadrature in high Knudsen number. But for the cavity problem with ${\rm Kn}>=1$, Newton-Cotes formula of 61x61 grids with velocity range $u,v=-4-4$ can avoid oscillating in the solution, which happens with Gaussian quadrature and second order interpolation. For example, the setting for Newton-Cotes integration
+The Gaussian quadrature used in the code is from Table IIa of \cite{Shizgal1981}, which is better than Gaussian-Hermite quadrature in high Knudsen number. But for the cavity problem with ${\rm Kn}>=1$, Newton-Cotes formula of 61x61 velocity grids with velocity range $u,v=-4-4$ can avoid oscillating in the solution, which happens with Gaussian quadrature and second order interpolation. For example, the setting for Newton-Cotes integration
 
 \begin{minted}{fortran}
     subroutine init()
