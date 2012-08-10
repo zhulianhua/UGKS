@@ -1,7 +1,7 @@
 !-----------------------------------------------------------------------------
 !UGKS2D - lid-driven cavity calculation using Unified Gas-Kinetic Scheme
 !-----------------------------------------------------------------------------
-!Copyright (C) 2012 Wang Ruijie <lainme993@gmail.com>
+!Copyright (C) 2012 Ruijie Wang <lainme993@gmail.com>
 !
 !This program is free software: you can redistribute it and/or modify it under
 !the terms of the GNU General Public License as published by the Free Software

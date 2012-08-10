@@ -1,6 +1,6 @@
 % This file is the user manual for the UGKS1D and UGKS2D code
 %
-% Copyright (C) 2012 Wang Ruijie <lainme993@gmail.com> 
+% Copyright (C) 2012 Ruijie Wang <lainme993@gmail.com>, Kun Xu <makxu@ust.hk>
 %
 % Permission is granted to copy, distribute and/or modify this document
 % under the terms of the GNU Free Documentation License, Version 1.3 or
@@ -68,13 +68,13 @@
 
 \begin{document}
 %title page
-\title{User Manual for UGKS1D and UGKS2D Code}
-\author{Wang Ruijie\\\href{mailto:lainme993@gmail.com}{lainme993@gmail.com}}
+\title{User's Manual for UGKS1D and UGKS2D Codes}
+\author{Ruijie Wang and Kun Xu}
 \maketitle
 
 %license statement
 \thispagestyle{empty}
-Copyright \copyright\ 2012 Wang Ruijie
+Copyright \copyright\ 2012 Ruijie Wang, Kun Xu
 
 Permission is granted to copy, distribute and/or modify this document
 under the terms of the GNU Free Documentation License, Version 1.3 or
@@ -90,116 +90,116 @@ copy of the license is included in the section entitled \nameref{chap:fdl}
 
 %UGKS method
 \chapter{Unified Gas-Kinetic Scheme}
-This chapter describes the Unified Gas-Kinetic Scheme presented in \cite{Xu2010,Xu2011}. This is a 1D formulation. The 2D formulation with directional splitting is presented in \cite{Huang2012}, and can be extended to a truly multidimensional formulation, see\cite{Xu2005}.
+This chapter describes the Unified Gas-Kinetic Scheme presented in \cite{Xu2010,Xu2011}. This is a 1D formulation. The 2D formulation with directional splitting is presented in \cite{Huang2012}, which can be extended to develop a truly multidimensional formulation, see\cite{Xu2005}.
 
 \section{Model equation}
 The model equation is the BGK-Shakhov model. In one dimensional case,
 \begin{equation}
     \label{eq:bgk-shakhov}
-    \frac{\partial f}{\partial t}+u\frac{\partial f}{\partial x}=\frac{f^+-f}{\tau}
+    \frac{\partial f}{\partial t}+u\frac{\partial f}{\partial x}=\frac{f^+-f}{\tau},
 \end{equation}
 where $f$ is the distribution function, $u$ is particle velocity, $\tau=\mu/p$ is particle collision time, $\mu$ is the dynamic viscosity, $p$ is the pressure and $f^+$ is the modified equilibrium distribution function.
 
-The modified equilibrium distribution is
+The modified equilibrium distribution is given by,
 \begin{equation}
-    f^+ = g\left[1+(1-\Pr){\bf c}\cdot{\bf q}\left(\frac{c^2}{RT}-5\right)/(5pRT)\right]=g+g^+
+    f^+ = g\left[1+(1-\Pr){\bf c}\cdot{\bf q}\left(\frac{c^2}{RT}-5\right)/(5pRT)\right]=g+g^+,
 \end{equation}
-where $g$ is the Maxwellian distribution, $\Pr$ is the Prandtl number, ${\bf c}$ is the random velocity, $q$ is heat flux, $R$ is gas constant and $T$ is the temperature.
+where $g$ is the Maxwellian distribution, $\Pr$ is the Prandtl number, ${\bf c}$ is the random velocity, ${\bf q}$ is heat flux, $R$ is gas constant and $T$ is the temperature.
 
-The Maxwellian distribution for 1D problem is
+The Maxwellian distribution for 1D problem is,
 \begin{equation}
     \label{eq:maxwell_1D}
-    g = \rho\left(\frac{\lambda}{\pi}\right)^{\frac{K+1}{2}}e^{-\lambda((u-U)^2+\xi^2)}
+    g = \rho\left(\frac{\lambda}{\pi}\right)^{\frac{K+1}{2}}e^{-\lambda((u-U)^2+\xi^2)},
 \end{equation}
 where $\rho$ is density, $\lambda=m/2kT$, $m$ is molecule mass, $k$ is Boltzmann constant, $U$ is the macroscopic velocity, $K$ is the number of internal degree of freedom and $\xi^2=\xi_1^2+\xi_2^2...+\xi_K^2$. For example, a monatomic gas at 1D problem has $K=2$ to account for the motion in $y,z$ direction, and $\xi^2=v^2+w^2$, where $v,w$ are particle velocity in $y,z$ direction. 
 
-The relation between $K$ and the ratio of specific heat is
+The relation between $K$ and the ratio of specific heat is,
 \begin{equation} 
-    \gamma = \frac{K+3}{K+1}
+    \gamma = \frac{K+3}{K+1}.
 \end{equation}
 
 The dynamic viscosity can be calculated from Sutherland's law or hard-sphere(HS)/variable hard-sphere model(VHS),
 \begin{equation} 
     \label{eq:viscosity}
-    \mu = \mu_{ref}\left(\frac{T}{T_{ref}}\right)^\omega
+    \mu = \mu_{ref}\left(\frac{T}{T_{ref}}\right)^\omega,
 \end{equation} 
 where $\mu_{ref}$ is the reference viscosity and $T_{ref}$ is the reference temperature, $\omega$ is the index related to HS or VHS model.
 
-The collision term meets the requirement of conservative constraint or capability condition
+The collision term meets the requirement of conservative constraint or compatibility condition
 \begin{equation} 
-    \int (f^+-f)\psi d\Xi=0
+    \int (f^+-f)\psi d\Xi=0,
 \end{equation} 
-where $\psi=(1,u,1/2(u^2+\xi^2))^T$ is the collision invariants and $d\Xi=dud\xi$
+where $\psi=(1,u,1/2(u^2+\xi^2))^T$ is the collision invariants and $d\Xi=dud\xi$.
 
-The macroscopic variables can be calculated via
+The macroscopic variables can be calculated via,
 \begin{equation}
-W=\begin{pmatrix} \rho\\ \rho U\\ \rho E \end{pmatrix} = \int \psi fd\Xi
+W=\begin{pmatrix} \rho\\ \rho U\\ \rho E \end{pmatrix} = \int \psi fd\Xi,
 \end{equation}
 \begin{equation}
-    p=\frac{1}{3}\int [(u-U)^2+\xi^2]fd\Xi
+    p=\frac{1}{3}\int [(u-U)^2+\xi^2]fd\Xi,
 \end{equation}
 \begin{equation}
-    q=\frac{1}{2}\int (u-U)[(u-U)^2+\xi^2]fd\Xi
+    q=\frac{1}{2}\int (u-U)[(u-U)^2+\xi^2]fd\Xi,
 \end{equation}
-where $E$ is total energy.
+where $\rho E$ is total energy.
 
 An integral solution of the BGK-Shakhov model can be constructed by the method of characteristics\cite{Prendergast1993},
 \begin{equation}
     \label{eq:csolution}
-    f(x,t,u,\xi)=\frac{1}{\tau}\int_{t^n}^t f^+(x',t',u,\xi)e^{-(t-t')/\tau}dt'+e^{-(t-t^n)/\tau}f_0^n(x-u(t-t^n),t^n,u,\xi)
+    f(x,t,u,\xi)=\frac{1}{\tau}\int_{t^n}^t f^+(x',t',u,\xi)e^{-(t-t')/\tau}dt'+e^{-(t-t^n)/\tau}f_0^n(x-u(t-t^n),t^n,u,\xi),
 \end{equation}
-where $x'=x-u(t-t')$ is the particle trajectory and $f_0^n$ is the initial gas distribution function at $t^n$
+where $x'=x-u(t-t')$ is the particle trajectory and $f_0^n$ is the initial gas distribution function at $t^n$.
 
 \section{Solution algorithm}
-For the numerical computation, in addition to the discretization of physical space and time, the velocity space is also discretized. That is, the distribution function is for some discrete particle velocities instead of continuous velocity space from $-\infty$ to $\infty$. Then the moments of the non-equilibrium distribution function are calculated through numerical integration(the moments of equilibrium distribution are still calculated from analytical integration). The discretization of the velocity space is determined by the chosen numerical integration method.
+For the numerical computation, in addition to the discretization of physical space and time, the velocity space is also discretized. That is, the distribution function is for some discrete particle velocities instead of continuous velocity space from $-\infty$ to $\infty$ as in \cite{Xu2001}. Then the moments of the non-equilibrium distribution function are calculated through numerical integration(the moments of equilibrium distribution are still calculated using analytical integration). The discretization of the velocity space is determined by the choice of numerical integration method.
 
 In the finite volume approach, if trapezoidal rule is used for the approximation of collision term, Eq. \ref{eq:bgk-shakhov} becomes,
 \begin{equation} 
     \label{eq:bgk-shakhov_discrete}
-    f_{i,k}^{n+1} = f_{i,k}^n+\frac{1}{\Delta x}({\bf F}_{i-1/2}-{\bf F}_{i+1/2})+\frac{\Delta t}{2}\left(\frac{f_{i,k}^{+(n+1)}-f_{i,k}^{n+1}}{\tau^{n+1}}+\frac{f_{i,k}^{+(n)}-f_{i,k}^n}{\tau^n}\right)
+    f_{i,k}^{n+1} = f_{i,k}^n+\frac{1}{\Delta x}\int_{t^n}^{t^{n+1}}({\bf f}_{i-1/2}-{\bf f}_{i+1/2})dt+\frac{\Delta t}{2}\left(\frac{f_{i,k}^{+(n+1)}-f_{i,k}^{n+1}}{\tau^{n+1}}+\frac{f_{i,k}^{+(n)}-f_{i,k}^n}{\tau^n}\right),
 \end{equation}
-where $f_{i,k}^n$ and $f_{i,k}^{n+1}$ are cell averaged distribution function of the i-th cell and k-th discrete particle velocity $u_k$ at time $t=t^n$ and $t=t^{n+1}$ respectively, $\Delta x$ is the cell length and $\Delta t$ is the time step, ${\bf F}_{i-1/2}$ and ${\bf F}_{i+1/2}$ are the flux of the distribution function across the cell interface integrated over the whole time step, $f_{i,k}^{+(n)}$ and $f_{i,k}^{+(n+1)}$ are modified equilibrium distribution, $\tau^n$ and $\tau^{n+1}$ are particle collision time.
+where $f_{i,k}^n$ and $f_{i,k}^{n+1}$ are cell averaged distribution function of the i-th cell and k-th discrete particle velocity $u_k$ at time $t^n$ and $t^{n+1}$ respectively, $\Delta x$ is the cell length and $\Delta t$ is the time step, ${\bf f}_{i-1/2}$ and ${\bf f}_{i+1/2}$ are the fluxes of the distribution function across the cell interface, $f_{i,k}^{+(n)}$ and $f_{i,k}^{+(n+1)}$ are modified equilibrium distribution, $\tau^n$ and $\tau^{n+1}$ are particle collision time.
 
-Multiplying the collision invariants to Eq. \ref{eq:bgk-shakhov_discrete} and make integration over the velocity space, the evolution of conservative variables becomes
+Multiplying the collision invariants to Eq. \ref{eq:bgk-shakhov_discrete} and make integration over the velocity space, the evolution of conservative flow variables becomes,
 \begin{equation} 
     \label{eq:conservative_discrete}
-    W_i^{n+1} = W_i^n+\frac{1}{\Delta x}({\bf W}_{i-1/2}-{\bf W}_{i+1/2})
+    W_i^{n+1} = W_i^n+\frac{1}{\Delta x}({\bf F}_{i-1/2}-{\bf F}_{i+1/2}),
 \end{equation}
-where $\displaystyle{\bf W} = \int\psi{\bf F}d\Xi$
+where $\displaystyle{\bf F} = \int_{t^n}^{t^{n+1}}\int\psi{\bf f}d\Xi dt$.
 
-In order to update the distribution function in Eq. \ref{eq:bgk-shakhov_discrete}, there are three unknowns should be obtained: the flux ${\bf F}$, the modified equilibrium distribution $f^{+(n+1)}$ and collision time $\tau^{n+1}$ at the next time level.
+In order to update the distribution function in Eq. \ref{eq:bgk-shakhov_discrete}, there are three unknowns to be obtained: the interface gas distribution function $f$, the modified equilibrium distribution $f^{+(n+1)}$ and collision time $\tau^{n+1}$ at the next time level.
 
-The flux ${\bf F}$ is calculated by using the integral solution Eq. \ref{eq:csolution} at the cell interface. Since $f^{+(n+1)}$ and $\tau^{n+1}$ have one-to-one correspondence to the macroscopic variables, they can be obtained by updating the conservative variables first using Eq. \ref{eq:conservative_discrete}.
+The flux ${\bf f}$ is calculated using the integral solution Eq. \ref{eq:csolution} at the cell interface. Since $f^{+(n+1)}$ and $\tau^{n+1}$ have one-to-one correspondence to the macroscopic variables, they are obtained by using the updated conservative variables in Eq. \ref{eq:conservative_discrete}.
 
-In order to remove the dependence of distribution functions on the internal degree of freedom $\xi$, the reduced distribution function \cite{Yang1995} is used in real computation, which is defined as
+In order to remove the dependence of distribution functions on the internal degree of freedom $\xi$, the reduced distribution function \cite{Yang1995,Chu1965} is used in real computation, which is defined as,
 \begin{equation} 
-    h = \int_{-\infty}^{\infty}fd\xi,\quad b = \int_{-\infty}^{\infty}\xi^2 f d\xi
+    h = \int_{-\infty}^{\infty}fd\xi,\quad b = \int_{-\infty}^{\infty}\xi^2 f d\xi,
 \end{equation} 
-and the reduced modified equilibrium distribution 
-$$h^+ = H+H^+,\quad b^+ = B+B^+$$
-where the corresponding reduced Maxwellian distribution $g$ becomes
+and the reduced modified equilibrium distributions are,
+$$h^+ = H+H^+,\quad b^+ = B+B^+,$$
+where the corresponding reduced Maxwellian distribution $g$ becomes,
 \begin{equation} 
     \label{eq:reduced_g}
-    H = \int_{-\infty}^{\infty}gd\xi = \rho\left(\frac{\lambda}{\pi}\right)^{1/2}e^{-\lambda(u-U)^2},\quad B = \int_{-\infty}^{\infty}\xi^2 gd\xi =\frac{K}{2\lambda}H
+    H = \int_{-\infty}^{\infty}gd\xi = \rho\left(\frac{\lambda}{\pi}\right)^{1/2}e^{-\lambda(u-U)^2},\quad B = \int_{-\infty}^{\infty}\xi^2 gd\xi =\frac{K}{2\lambda}H,
 \end{equation}
-and the corresponding reduced $g^+$ becomes
+and the corresponding terms related to $g^+$ becomes,
 \begin{equation}
     \label{eq:reduced_gp}
     \begin{aligned}
-        & H^+ = \int_{-\infty}^{\infty}g^+d\xi = \frac{4(1-\Pr)\lambda^2}{5\rho}(u-U)q(2\lambda(u-U)^2+k-5)H \\
-        & B^+ = \int_{-\infty}^{\infty}\xi^2g^+d\xi = \frac{4(1-\Pr)\lambda^2}{5\rho}(u-U)q(2\lambda(u-U)^2+k-3)B
+        & H^+ = \int_{-\infty}^{\infty}g^+d\xi = \frac{4(1-\Pr)\lambda^2}{5\rho}(u-U)q(2\lambda(u-U)^2+K-5)H, \\
+        & B^+ = \int_{-\infty}^{\infty}\xi^2g^+d\xi = \frac{4(1-\Pr)\lambda^2}{5\rho}(u-U)q(2\lambda(u-U)^2+K-3)B,
     \end{aligned}
 \end{equation}
 
-Then the update of $f$ using Eq. \ref{eq:bgk-shakhov_discrete} becomes two similar equations for the update of $h$ and $b$, respectively
+Then the update of $f$ using Eq. \ref{eq:bgk-shakhov_discrete} becomes two similar equations for the update of $h$ and $b$, respectively.
 
-The overview flow chart of the solution algorithm in one iteration is shown in Figure. ~\ref{pic:solution}
+The overview flow chart of the solution algorithm in one iteration is shown in Figure. ~\ref{pic:solution}.
 
 \begin{figure}[htb!]
     \centering
     \begin{tikzpicture}[thick]
         \path[line] node[block] (time) {calculate time step};
-        \path[line] node[block,below of=time] (interp) {reconstruction \\ calculate slop of h,b in each cell}
+        \path[line] node[block,below of=time] (interp) {(reconstruction) \\ calculate slop of h,b in each physical cell}
         (time) edge (interp);
         \path[line] node[block,below of=interp] (flux) {calculate interface flux of $h,b, W$}
         (interp) edge (flux);
@@ -217,91 +217,90 @@ The overview flow chart of the solution algorithm in one iteration is shown in F
 \section{Nondimensionalization}
 In the program, the following nondimensionalization is used,
 \begin{gather*}
-    \hat t=\frac{t}{t_\infty},\ \hat u_x=\frac{u_x}{C_\infty},\ \hat x=\frac{x}{L_\infty},\ \hat \rho=\frac{\rho}{\rho_\infty},\ \hat T=\frac{T}{T_\infty}, \hat p=\frac{p}{\rho_\infty C_\infty^2} \\
-    \hat q=\frac{q}{\rho_\infty C_\infty^3},\ \hat h=\frac{h}{\rho_\infty/C_\infty},\ \hat b=\frac{b}{\rho_\infty},\ \hat E=\frac{E}{C_\infty^2}, \hat\mu = \frac{\mu}{\rho_\infty C_\infty L_\infty}
+    \hat t=\frac{t}{t_\infty},\ \hat u_x=\frac{u_x}{C_\infty},\ \hat x=\frac{x}{L_\infty},\ \hat \rho=\frac{\rho}{\rho_\infty},\ \hat T=\frac{T}{T_\infty}, \hat p=\frac{p}{\rho_\infty C_\infty^2}, \\
+    \hat q=\frac{q}{\rho_\infty C_\infty^3},\ \hat h=\frac{h}{\rho_\infty/C_\infty},\ \hat b=\frac{b}{\rho_\infty},\ \hat E=\frac{E}{C_\infty^2}, \hat\mu = \frac{\mu}{\rho_\infty C_\infty L_\infty},
 \end{gather*}
 
-The free stream variables are related through
-$$C_\infty=\sqrt{2RT_\infty},\ t_\infty=\frac{L_\infty}{C_\infty},\ \lambda_\infty=1/C_\infty^2$$
+The free stream variables are related through,
+$$C_\infty=\sqrt{2RT_\infty},\ t_\infty=\frac{L_\infty}{C_\infty},\ \lambda_\infty=1/C_\infty^2.$$
 
-In the following, all variables are nondimensionalized, but we will drop the \textasciicircum for simplicity. After nondimensionalization and using the reduced distribution function, the expressions for macroscopic variables become
+In the following, all variables are nondimensionalized, but we will drop the "\textasciicircum" for simplicity. After nondimensionalization and using the reduced distribution function, the expressions for macroscopic variables become,
 \begin{equation} 
     \label{eq:conserved_var}
     \begin{aligned}
-        &\rho=\int h{\rm du}=\sum\alpha_k h_k\\
-        &\rho U=\int hu{\rm du}=\sum\alpha_k h_k u_k\\
-        &\rho E=\frac{1}{2}\left(\int hu^2{\rm du}+\int b{\rm du}\right)=\frac{1}{2}\left(\sum\alpha_k h_k u_k^2+\sum\alpha_k b_k\right)
+        &\rho=\int h{\rm du}=\sum\alpha_k h_k,\\
+        &\rho U=\int hu{\rm du}=\sum\alpha_k h_k u_k,\\
+        &\rho E=\frac{1}{2}\left(\int hu^2{\rm du}+\int b{\rm du}\right)=\frac{1}{2}\left(\sum\alpha_k h_k u_k^2+\sum\alpha_k b_k\right),
     \end{aligned}
 \end{equation}
 \begin{equation} 
-    \frac{K+1}{2}p=\int(u-U)^2h{\rm du}+\int b{\rm du}=\sum\alpha_k(u_k-U)^2 h_k+\sum\alpha_k b_k
+    \frac{K+1}{2}p=\int(u-U)^2h{\rm du}+\int b{\rm du}=\sum\alpha_k(u_k-U)^2 h_k+\sum\alpha_k b_k,
 \end{equation}
 \begin{equation} 
     \label{eq:heatflux}
     \begin{aligned}
         q&=\frac{1}{2}\left[\int(u-U)(u-U)^2h{\rm du}+\int(u-U)b{\rm du}\right]\\
-         &=\frac{1}{2}\left[\sum\alpha_k (u_k-U)(u_k-U)^2 h_k+\sum\alpha_k (u_k-U)b_k\right]
+         &=\frac{1}{2}\left[\sum\alpha_k (u_k-U)(u_k-U)^2 h_k+\sum\alpha_k (u_k-U)b_k\right],
     \end{aligned}
 \end{equation}
 where $\alpha_k$ is the weight of the numerical integration at the k-th particle velocity. The summation is over all the discrete particle velocity.
 
-The equation of state
+The equation of state is,
 \begin{equation} 
     \label{eq:eos}
-    p=\frac{1}{2}\rho T,\quad \lambda=\frac{1}{T}
+    p=\frac{1}{2}\rho T,\quad \lambda=\frac{1}{T}.
 \end{equation}
-
-Other expressions are not changed.
 
 \section{Time step and reconstruction}
 The time step is determined by the CFL condition
 \begin{equation} 
-    \Delta t={\rm CFL}\frac{\Delta x}{|U|+c}
+    \Delta t={\rm CFL}\frac{\Delta x}{|U|+c},
 \end{equation}
-where CFL is the CFL number, $c$ is the speed of sound. The macroscopic velocity $U$ can also be replace by $\max(U,u)$
+where CFL is the CFL number, $c$ is the speed of sound. The macroscopic velocity $|U|+c$ can also be replaced by $\max(|u|)$.
 
-In the program, the van Leer limiter is used for the reconstruction. For example, the slope of $h$ at the i-th cell and k-th particle velocity is
+In the program, the van Leer limiter is used for the reconstruction. For example, the slope of $h$ at the i-th cell and k-th particle velocity is,
 \begin{equation} 
-    \sigma_{i,k}^h = ({\rm sign}(s_1)+{\rm sign}(s_2))\frac{|s_1||s_2|}{|s_1|+|s_2|}
+    \sigma_{i,k}^h = ({\rm sign}(s_1)+{\rm sign}(s_2))\frac{|s_1||s_2|}{|s_1|+|s_2|},
 \end{equation}
 where $s_1=(h_{i,k}-h_{i-1,k})/(x_i-x_{i-1}), s_2=(h_{i+1,k}-h_{i,k})/(x_{i+1}-x_{i})$.
 
 The slope of $b$ is calculated in the same way.
 
-\section{Calculation of interface flux}
+\section{The algorithm}
 \label{sec:inner_flux}
 Take the interface $x_{i+1/2}=0$ at $t^n=0$ as example.
 
-\subsection{The algorithm}
-Here the original distribution function is used for illustration. From Eq. \ref{eq:csolution}, the integral solution at the cell interface is
+\subsection{The calculation of interface fluxes}
+Here the original distribution function is used for illustration. From Eq. \ref{eq:csolution}, the integral solution at the cell interface is,
 \begin{equation}
     \label{eq:csolution_interface}
-    f(0,t,u_k,\xi)=\frac{1}{\tau}\int_{0}^t f^+(x',t',u_k,\xi)e^{-(t-t')/\tau}dt'+e^{-t/\tau}f_0(-u_kt,0,u_k,\xi)
+    f(0,t,u_k,\xi)=\frac{1}{\tau}\int_{0}^t f^+(x',t',u_k,\xi)e^{-(t-t')/\tau}dt'+e^{-t/\tau}f_0(-u_kt,0,u_k,\xi).
 \end{equation}
 
-The initial distribution function around the interface $f_0$ is
+The initial distribution function around the interface $f_0$ is,
 \begin{equation}
     \label{eq:f0}
     f_0(x,0,u_k,\xi) = 
     \begin{cases}
-        f_{i+1/2,k}^L+\sigma_{i,k}x,& x\leqslant 0\\ 
-        f_{i+1/2,k}^R+\sigma_{i+1,k}x,& x> 0\\ 
+        f_{i+1/2,k}^L+\sigma_{i,k}x,& x\leqslant 0,\\ 
+        f_{i+1/2,k}^R+\sigma_{i+1,k}x,& x> 0,\\ 
     \end{cases}
 \end{equation}
 where $f_{i+1/2,k}^L, f_{i+1/2,k}^R$ are the reconstructed initial distribution functions at the left and right side of the interface.
 
-The Maxwellian distribution around the interface in $f^+$ is approximated by Taylor expansion
+The Maxwellian distribution around the interface in $f^+$ is approximated by Taylor expansion,
 \begin{equation} 
     \label{eq:g_interface}
-    g(x,t,u,\xi)=g_0[1+(1-H[x])a^Lx+H[x]a^Rx+At]
+    g(x,t,u,\xi)=g_0[1+(1-H[x])a^Lx+H[x]a^Rx+At],
 \end{equation}
-where $g_0$ is the Maxwellian distribution at $x=0,t=0$ and $H[x]$ is the Heaviside function$$H[x]=\begin{cases}0,& x<0\\ 1,& x\geqslant 0\end{cases}$$
+where $g_0$ is the Maxwellian distribution at $x=0,t=0$ and $H[x]$ is the Heaviside function
+$$H[x]=\begin{cases}0,& x<0,\\ 1,& x\geqslant 0.\end{cases}$$
 
-$a^L,a^R$ and $A$ have the same form,
-$$ a = a_1+a_2u+a_3\frac{1}{2}(u^2+\xi^2)$$
-where $a_1,a_2,a_3$ are local constants
+$a^L,a^R$ and $A$ have the same form \cite{Xu2001},
+$$ a = a_1+a_2u+a_3\frac{1}{2}(u^2+\xi^2),$$
+where $a_1,a_2,a_3$ are local constants.
 
-Inserting Eq. \ref{eq:f0} and Eq. \ref{eq:g_interface} into Eq. \ref{eq:csolution_interface}, one obtains
+Inserting Eq. \ref{eq:f0} and Eq. \ref{eq:g_interface} into Eq. \ref{eq:csolution_interface}, one obtains,
 \begin{equation} 
     \label{eq:csolution_final}
     \begin{aligned}
@@ -309,35 +308,35 @@ Inserting Eq. \ref{eq:f0} and Eq. \ref{eq:g_interface} into Eq. \ref{eq:csolutio
                        &+(\tau(-1+e^{-t/\tau})+te^{-t/\tau})(a^LH[u_k]+a^R(1-H[u_k]))u_kg_0\\
                        &+\tau(t/\tau-1+e^{-t/\tau})Ag_0\\
                        &+e^{-t/\tau}((f_{i+1/2,k}^L-u_kt\sigma_{i,k})H[u_k]+(f_{i+1/2,k}^R-u_kt\sigma_{i+1,k})(1-H[u_k]))\\
-        =&{\tilde g}_{i+1/2,k}+{\tilde f}_{i+1/2,k}
+        =&{\tilde g}_{i+1/2,k}+{\tilde f}_{i+1/2,k},
     \end{aligned}
 \end{equation}
-where ${\tilde g}_{i+1/2,k}$ is the first three terms related to equilibrium distribution, ${\tilde f}_{i+1/2,k}$ is the last two terms related to the initial non-equilibrium distribution
+where ${\tilde g}_{i+1/2,k}$ is the first three terms related to equilibrium distribution, ${\tilde f}_{i+1/2,k}$ is the last term related to the initial non-equilibrium distribution.
 
-$g_0$ or $W_0$ can be obtained by applying the capability condition at $x=0,t=0$
-$$\int (f^+-f)|_{x=0,t=0}\psi d\Xi=0$$
-which gives
+Here $g_0$ or $W_0$ in Eq. \ref{eq:g_interface} can be obtained by applying the compatibility condition at $x=0,t=0$,
+$$\int (f^+-f)|_{x=0,t=0}\psi d\Xi=0,$$
+which gives,
 \begin{equation} 
     \label{eq:solve_g0}
-    W_0=\int g_0\psi d\Xi=\int f_0(0,0,u_k,\xi)\psi d\Xi
+    W_0=\int g_0\psi d\Xi=\int f_0(0,0,u_k,\xi)\psi d\Xi.
 \end{equation}
 
-$a^L,a^R,A$ are obtained from the slope of conservative variables
+Then, $a^L,a^R,A$ are obtained from the slope of conservative variables,
 \begin{equation}
     \label{eq:microslope_space}
-    \frac{1}{\rho_0}\left(\frac{\partial W}{\partial x}\right)^L=\int a^L g_0\psi d\Xi,\quad \frac{1}{\rho_0}\left(\frac{\partial W}{\partial x}\right)^R=\int a^R g_0\psi d\Xi
+    \left(\frac{\partial W}{\partial x}\right)^L=\int a^L g_0\psi d\Xi,\quad \left(\frac{\partial W}{\partial x}\right)^R=\int a^R g_0\psi d\Xi,
 \end{equation}
 \begin{equation} 
     \label{eq:microslope_time}
-    \frac{1}{\rho_0}\frac{\partial W}{\partial t}=\int Ag_0\psi d\Xi
+    \frac{\partial W}{\partial t}=\int Ag_0\psi d\Xi.
 \end{equation}
 
-The time derivative of $W$ can be calculated via the capability condition
-$$\left.\frac{\rm d}{{\rm d}t}\int(f^+-f)\psi d\Xi\right|_{x=0,t=0}=0$$
-which gives
+The time derivative of $W$ can be calculated via the compatibility condition,
+$$\left.\frac{\rm d}{{\rm d}t}\int(f^+-f)\psi d\Xi\right|_{x=0,t=0}=0,$$
+which gives,
 \begin{equation} 
     \label{eq:solve_wt}
-    \frac{\partial W}{\partial t} = -\int\left(a^LH[u]+a^R(1-H[u])\right)ug_0\psi d\Xi
+    \frac{\partial W}{\partial t} = -\int\left(a^LH[u]+a^R(1-H[u])\right)ug_0\psi d\Xi.
 \end{equation}
 
 \subsection{The numerical procedure}
@@ -346,7 +345,7 @@ The flow chart of the numerical procedure is shown in Figure. \ref{pic:flux}
 \begin{figure}[htb!]
     \centering
     \begin{tikzpicture}[thick]
-        \path[line] node[block] (f0) {from reconstruction, obtain $h_{i+1/2,k},b_{i+1/2,k}$};
+        \path[line] node[block] (f0) {From reconstruction, obtain $h_{i+1/2,k},b_{i+1/2,k}$};
         \path[line] node[block,below of=f0] (w0) {from Eq. \ref{eq:solve_g0}, obtain $W_0$}
         (f0) edge (w0);
         \path[line] node[block,below of=w0] (as) {from Eq. \ref{eq:microslope_space}, obtain $a^L,a^R$}
@@ -371,121 +370,130 @@ The flow chart of the numerical procedure is shown in Figure. \ref{pic:flux}
 \subsubsection*{Reconstruct initial distribution}
 Take $h$ as example. Since we take value from $h_{i+1/2,k}^L$ only if $u_k\geqslant 0$ and take value from $h_{i+1/2,k}^R$ only if $u_k <0$ (see Eq. \ref{eq:csolution_final}), there is no need to store the left and right values separately. 
 
-Instead, we define the variable
-$$h_{i+1/2,k} = \begin{cases} h_{i,k}+(x_{i+1/2}-x_i)\sigma_{i,k}^h, & u_k \geqslant 0\\ h_{i+1,k}-(x_{i+1}-x_{i+1/2})\sigma_{i+1,k}^h, & u_k < 0\end{cases}
+We define the variable,
 $$
-and similarly
+h_{i+1/2,k} = 
+\begin{cases} 
+h_{i,k}+(x_{i+1/2}-x_i)\sigma_{i,k}^h, & u_k \geqslant 0,\\ 
+h_{i+1,k}-(x_{i+1}-x_{i+1/2})\sigma_{i+1,k}^h, & u_k < 0,
+\end{cases}
 $$
-\sigma_{i+1/2,k}^h = \begin{cases} \sigma_{i,k}^h, & u_k \geqslant 0\\ \sigma_{i+1,k}^h, & u_k < 0\end{cases}
+and similarly,
+$$
+\sigma_{i+1/2,k}^h = 
+\begin{cases} 
+\sigma_{i,k}^h, & u_k \geqslant 0,\\ 
+\sigma_{i+1,k}^h, & u_k < 0.
+\end{cases}
 $$
 
-In the program, they are written as
-$$h_{i+1/2,k} =\sigma_{i,k}^h H[u_k]+\sigma_{i+1,k}^h(1-H[u_k])$$
-and
-$$\sigma_{i+1/2,k}^h = (h_{i,k}+(x_{i+1/2}-x_i)\sigma_{i,k}^h)H[u_k]+(h_{i+1,k}-(x_{i+1}-x_{i+1/2})\sigma_{i+1,k}^h)(1-H[u_k])$$
+In the program, they are written as,
+$$\sigma_{i+1/2,k}^h =\sigma_{i,k}^h H[u_k]+\sigma_{i+1,k}^h(1-H[u_k]),$$
+and,
+$$h_{i+1/2,k} = (h_{i,k}+(x_{i+1/2}-x_i)\sigma_{i,k}^h)H[u_k]+(h_{i+1,k}-(x_{i+1}-x_{i+1/2})\sigma_{i+1,k}^h)(1-H[u_k]).$$
 
 \subsubsection*{Calculate $W_0$}
-$W_0$ is calculated from Eq. \ref{eq:conserved_var}, with $h_k=h_{i+1/2,k}, b_k=b_{i+1/2,k}$
+$W_0$ is calculated from Eq. \ref{eq:conserved_var}, with $h_k=h_{i+1/2,k}, b_k=b_{i+1/2,k}$.
 
-Then the primary variables is obtained from the relation(the expression for $\lambda$ only holds for equilibrium state)
-$$\rho_0 = \rho_0,\quad U_0=\frac{\rho_0 U_0}{\rho_0},\quad \lambda_0=\frac{(K+1)\rho_0}{4\left(\rho_0 E_0-\frac{1}{2}\rho(U_0^2+V_0^2)\right)}$$
+Then the primary variables is obtained from the relation (the expression for $\lambda$ below only holds for equilibrium state),
+$$\rho_0 = \rho_0,\quad U_0=\frac{\rho_0 U_0}{\rho_0},\quad \lambda_0=\frac{(K+1)\rho_0}{4\left(\rho_0 E_0-\frac{1}{2}\rho(U_0^2+V_0^2)\right)}.$$
 
-The heat flux is calculated by Eq. \ref{eq:heatflux}, with $h_k=h_{i+1/2,k},b_k=b_{i+1/2,k},U=U_0$
+The heat flux is calculated by Eq. \ref{eq:heatflux}, with $h_k=h_{i+1/2,k},b_k=b_{i+1/2,k},U=U_0$.
 
 \subsubsection*{Calculate $a^L,a^R$}
-The macroscopic slope is approximated by
-$$\left(\frac{\partial W}{\partial x}\right)^L\approx\frac{W_0-W_{i}}{x_{i+1/2}-x_i},\quad \left(\frac{\partial W}{\partial x}\right)^R\approx\frac{W_{i+1}-W_{0}}{x_{i+1}-x_{i+1/2}}$$
-and the three components of $a^L,a^R$ are calculated from
+The macroscopic slope is approximated by,
+$$\left(\frac{\partial W}{\partial x}\right)^L\approx\frac{W_0-W_{i}}{x_{i+1/2}-x_i},\quad \left(\frac{\partial W}{\partial x}\right)^R\approx\frac{W_{i+1}-W_{0}}{x_{i+1}-x_{i+1/2}},$$
+and the three components of $a^L,a^R$ are calculated from,
 \begin{equation} 
     \label{eq:micro_slope}
     \begin{aligned}
-        a_3&=\frac{4\lambda_0^2}{(K+1)\rho_0}\left[2\frac{\partial\rho E}{\partial x}+\left(U_0^2-\frac{K+1}{2\lambda_0}\right)\frac{\partial\rho}{\partial x}-2U_0\frac{\partial\rho U}{\partial x}\right]\\
-        a_2&=\frac{2\lambda_0}{\rho_0}\left(\frac{\partial\rho U}{\partial x}-U_0\frac{\partial\rho}{\partial x}\right)-U_0a_3\\
-        a_1&=\frac{1}{\rho_0}\frac{\partial\rho}{\partial x}-U_0a_2-\frac{1}{2}\left(U_0^2+\frac{K+1}{2\lambda_0}\right)a_3
+        a_3&=\frac{4\lambda_0^2}{(K+1)\rho_0}\left[2\frac{\partial\rho E}{\partial x}+\left(U_0^2-\frac{K+1}{2\lambda_0}\right)\frac{\partial\rho}{\partial x}-2U_0\frac{\partial\rho U}{\partial x}\right],\\
+        a_2&=\frac{2\lambda_0}{\rho_0}\left(\frac{\partial\rho U}{\partial x}-U_0\frac{\partial\rho}{\partial x}\right)-U_0a_3,\\
+        a_1&=\frac{1}{\rho_0}\frac{\partial\rho}{\partial x}-U_0a_2-\frac{1}{2}\left(U_0^2+\frac{K+1}{2\lambda_0}\right)a_3.
     \end{aligned}
 \end{equation}
 
 \subsubsection*{Calculate ${\partial W}/{\partial t}$ and $A$}
-From Eq. \ref{eq:solve_wt}, the time derivative of $W$ is calculated from
-$$\frac{\partial W}{\partial t}=-\rho_0\left(<a^Lu\psi>_{>0}+<a^Ru\psi>_{<0}\right)$$
-where $<...>$ is the moments of Maxwellian distribution function. The detail definition and calculation can be found in \nameref{appendix:moments}
+From Eq. \ref{eq:solve_wt}, the time derivative of $W$ is calculated from,
+$$\frac{\partial W}{\partial t}=-\rho_0\left(<a^Lu\psi>_{>0}+<a^Ru\psi>_{<0}\right),$$
+where $<...>$ is the moments of Maxwellian distribution function. The detail definition and calculation can be found in \cite{Xu2001} and also \nameref{appendix:moments}.
 
 $A$ is calculated in the same way as $a^L,a^R$ using Eq. \ref{eq:micro_slope}.
 
 \subsubsection*{Calculate collision time and some time integration terms}
-From Eq. \ref{eq:viscosity} and Eq. \ref{eq:eos}, the collision time is
-$$\tau = \frac{2\lambda_0^{1-\omega}}{\rho_0}\mu_{\infty}$$
+From Eq. \ref{eq:viscosity} and Eq. \ref{eq:eos}, the collision time is,
+$$\tau = \frac{2\lambda_0^{1-\omega}}{\rho_0}\mu_{\infty}.$$
 
-Some time integrals used in the evaluation of flux is listed below
+Some time integrals used in the evaluation of flux are listed below,
 $$
 \begin{aligned}
-    Mt_4 &= \int_{t^n}^{t^{n+1}} e^{-t/\tau}dt = \tau(1-e^{-\Delta t/\tau}) \\
-    Mt_5 &= \int_{t^n}^{t^{n+1}} te^{-t/\tau}dt = -\tau\Delta t e^{-\Delta t/\tau}+\tau Mt_4 \\
-    Mt_1 &= \int_{t^n}^{t^{n+1}} (1-e^{-t/\tau})dt = \Delta t-Mt_4 \\
-    Mt_2 &= \int_{t^n}^{t^{n+1}} (\tau(-1+e^{-t/\tau})+te^{-t/\tau})dt = -\tau Mt_1+Mt_5 \\
-    Mt_3 &= \int_{t^n}^{t^{n+1}} \tau(t/\tau-1+e^{-t/\tau})dt = \frac{1}{2}\Delta t^2-\tau Mt_1
+    Mt_4 &= \int_{t^n}^{t^{n+1}} e^{-t/\tau}dt = \tau(1-e^{-\Delta t/\tau}), \\
+    Mt_5 &= \int_{t^n}^{t^{n+1}} te^{-t/\tau}dt = -\tau\Delta t e^{-\Delta t/\tau}+\tau Mt_4, \\
+    Mt_1 &= \int_{t^n}^{t^{n+1}} (1-e^{-t/\tau})dt = \Delta t-Mt_4, \\
+    Mt_2 &= \int_{t^n}^{t^{n+1}} (\tau(-1+e^{-t/\tau})+te^{-t/\tau})dt = -\tau Mt_1+Mt_5, \\
+    Mt_3 &= \int_{t^n}^{t^{n+1}} \tau(t/\tau-1+e^{-t/\tau})dt = \frac{1}{2}\Delta t^2-\tau Mt_1.
 \end{aligned} 
 $$
 
 \subsubsection*{Calculate the flux of conservative variables related to $g_0$}
 Theoretically, $\int_{t^n}^{t^{n+1}}\int {\tilde g}_{i+1/2}u\psi d\Xi dt$ can be calculated analytically. But the integration related to $g^+$ is too complex, and will be calculated with numerical integration. Only the terms related to $g_0$ will be integrated analytically here.
-$${\bf W}_{g_0} = Mt_1\rho_0<u\psi>+Mt_2\rho_0\left(<a^Lu^2\psi>_{>0}+<a^Ru^2\psi>_{<0}\right)+Mt_3\rho_0<Au\psi>$$
+$${\bf F}_{g_0} = Mt_1\rho_0<u\psi>+Mt_2\rho_0\left(<a^Lu^2\psi>_{>0}+<a^Ru^2\psi>_{<0}\right)+Mt_3\rho_0<Au\psi>$$
 
 \subsubsection*{Calculate the flux of conservative variables related to $g^+$ and $f_0$}
 First evaluate $H_k,B_k$ corresponding to $g_0$ by Eq. \ref{eq:reduced_g},
-$$H_k = \rho_0\left(\frac{\lambda_0}{\pi}\right)^{1/2}e^{-\lambda_0(u_k-U_0)^2},\quad B_k = \frac{K}{2\lambda_0}H_k$$
-and then evaluate $H_{k}^+,B_{k}^+$ corresponding to $g^+$ by Eq. \ref{eq:reduced_gp}
+$$H_k = \rho_0\left(\frac{\lambda_0}{\pi}\right)^{1/2}e^{-\lambda_0(u_k-U_0)^2},\quad B_k = \frac{K}{2\lambda_0}H_k,$$
+and then evaluate $H_{k}^+,B_{k}^+$ corresponding to $g^+$ by Eq. \ref{eq:reduced_gp},
 $$
 \begin{aligned}
-    & H_k^+ = \frac{4(1-\Pr)\lambda_0^2}{5\rho_0}(u_k-U_0)q(2\lambda_0(u_k-U_0)^2+k-5)H_k\\
-    & B_k^+ = \frac{4(1-\Pr)\lambda_0^2}{5\rho_0}(u_k-U_0)q(2\lambda_0(u_k-U_0)^2+k-3)B_k
+    & H_k^+ = \frac{4(1-\Pr)\lambda_0^2}{5\rho_0}(u_k-U_0)q(2\lambda_0(u_k-U_0)^2+K-5)H_k,\\
+    & B_k^+ = \frac{4(1-\Pr)\lambda_0^2}{5\rho_0}(u_k-U_0)q(2\lambda_0(u_k-U_0)^2+K-3)B_k.
 \end{aligned}
 $$
 The flux of conservative variables related to $g^+$ is,
 $$
-{\bf W}_{g^+} = Mt_1
+{\bf F}_{g^+} = Mt_1
 \begin{pmatrix}
     \sum\alpha_k u_k H_k^+\\ \sum\alpha_k u_k^2 H_k^+\\ \frac{1}{2}\left(\sum\alpha_k u_k^3 H_k^+ + \sum\alpha_k u_k B_k^+\right)
-\end{pmatrix}
+\end{pmatrix}.
 $$
 
 The flux of conservative variables related to $f_0$ is,
 $$
-{\bf W}_{f_0} = Mt_4
+{\bf F}_{f_0} = Mt_4
 \begin{pmatrix}
     \sum\alpha_k u_k h_{i+1/2,k}\\ \sum\alpha_k u_k^2 h_{i+1/2,k}\\ \frac{1}{2}\left(\sum\alpha_k u_k^3 h_{i+1/2,k}+\sum\alpha_k u_k b_{i+1/2,k}\right)
 \end{pmatrix}
 -Mt_5
 \begin{pmatrix}
     \sum\alpha_k u_k^2 \sigma_{i+1/2,k}^h\\ \sum\alpha_k u_k^3 \sigma_{i+1/2,k}^h\\ \frac{1}{2}\left(\sum\alpha_k u_k^4 \sigma_{i+1/2,k}^h+\sum\alpha_k u_k^2 \sigma_{i+1/2,k}^b\right)
-\end{pmatrix}
+\end{pmatrix}.
 $$
 
-The flux of conservative variables is
-$${\bf W}_{i+1/2} = \int_{t^n}^{t^{n+1}}\int f_{i+1/2}u\psi d\Xi dt={\bf W}_{g_0}+{\bf W}_{g^+}+{\bf W}_{f_0}$$
+The flux of conservative variables is,
+$${\bf F}_{i+1/2} = \int_{t^n}^{t^{n+1}}\int f_{i+1/2}u\psi d\Xi dt={\bf F}_{g_0}+{\bf F}_{g^+}+{\bf F}_{f_0}.$$
 
 \subsubsection*{Calculate the flux of distribution functions}
-The flux of reduced distribution function $h$ is calculated by
+The flux of reduced distribution function $h$ is calculated by,
 $$
 \begin{aligned}
-    {\bf F}_{i+1/2,k}^h &= \int_{t^n}^{t^{n+1}}\int f_{i+1/2,k}u_k d\xi dt\\
+    \int_{t^n}^{t^{n+1}}{\bf f}_{i+1/2,k}^h dt &= \int_{t^n}^{t^{n+1}}\int f_{i+1/2,k}u_k d\xi dt\\
                         &= Mt_1 u_k (H_k+H_k^+)\\
                         &+ Mt_2 u_k^2 \left(a_1^L H_k + a_2^L u_k H_k + \frac{1}{2}a_3^L(u_k^2 H_k+B_k)\right)H[u_k]\\
                         &+ Mt_2 u_k^2 \left(a_1^R H_k + a_2^R u_k H_k + \frac{1}{2}a_3^R(u_k^2 H_k+B_k)\right)(1-H[u_k])\\
                         &+ Mt_3 u_k \left(A_1 H_k + A_2 u_k H_k + \frac{1}{2}A_3(u_k^2 H_k+B_k)\right)\\
-                        &+ Mt_4 u_k h_{i+1/2,k}-Mt_5 u_k^2 \sigma_{i+1/2,k}^h
+                        &+ Mt_4 u_k h_{i+1/2,k}-Mt_5 u_k^2 \sigma_{i+1/2,k}^h.
 \end{aligned} 
 $$
 
-The flux of reduced distribution function $b$ is calculated by
+The flux of reduced distribution function $b$ is calculated by,
 $$
 \begin{aligned}
-    {\bf F}_{i+1/2,k}^h &= \int_{t^n}^{t^{n+1}}\int f_{i+1/2,k}u_k d\xi dt\\
+    \int_{t^n}^{t^{n+1}}{\bf f}_{i+1/2,k}^h dt &= \int_{t^n}^{t^{n+1}}\int f_{i+1/2,k}u_k d\xi dt\\
                         &= Mt_1 u_k (B_k+B_k^+)\\
                         &+ Mt_2 u_k^2 \left(a_1^L B_k + a_2^L u_k B_k + \frac{1}{2}a_3^L(u_k^2 B_k+<\xi^4>H_k)\right)H[u_k]\\
                         &+ Mt_2 u_k^2 \left(a_1^R B_k + a_2^R u_k B_k + \frac{1}{2}a_3^R(u_k^2 B_k+<\xi^4>H_k)\right)(1-H[u_k])\\
                         &+ Mt_3 u_k \left(A_1 B_k + A_2 u_k B_k + \frac{1}{2}A_3(u_k^2 B_k+<\xi^4>H_k)\right)\\
-                        &+ Mt_4 u_k b_{i+1/2,k}-Mt_5 u_k^2 \sigma_{i+1/2,k}^b
+                        &+ Mt_4 u_k b_{i+1/2,k}-Mt_5 u_k^2 \sigma_{i+1/2,k}^b.
 \end{aligned} 
 $$
 
@@ -507,50 +515,50 @@ The procedure is shown in Figure. \ref{pic:update}
     \label{pic:update}
 \end{figure}
 
-The equation for updating $h^{n+1}$ and $b^{n+1}$ can be obtained from Eq. \ref{eq:bgk-shakhov_discrete}
+The equation for updating $h^{n+1}$ and $b^{n+1}$ can be obtained from Eq. \ref{eq:bgk-shakhov_discrete},
 $$
 \begin{aligned}
-    h_{i,k}^{n+1} &= \left(1+\frac{\Delta t}{2\tau^{n+1}}\right)^{-1}\left[h_{i,k}^n+\frac{1}{\Delta x}({\bf F}_{i-1/2}^h-{\bf F}_{i+1/2}^h)+\frac{\Delta t}{2}\left(\frac{h_{i,k}^{+(n+1)}}{\tau^{n+1}}+\frac{h_{i,k}^{+(n)}-h_{i,k}^n}{\tau^n}\right)\right]\\
-    b_{i,k}^{n+1} &= \left(1+\frac{\Delta t}{2\tau^{n+1}}\right)^{-1}\left[b_{i,k}^n+\frac{1}{\Delta x}({\bf F}_{i-1/2}^b-{\bf F}_{i+1/2}^b)+\frac{\Delta t}{2}\left(\frac{b_{i,k}^{+(n+1)}}{\tau^{n+1}}+\frac{b_{i,k}^{+(n)}-b_{i,k}^n}{\tau^n}\right)\right]\\
+    h_{i,k}^{n+1} &= \left(1+\frac{\Delta t}{2\tau^{n+1}}\right)^{-1}\left[h_{i,k}^n+\frac{1}{\Delta x}\int_{t^n}^{t^{n+1}}({\bf f}_{i-1/2}^h-{\bf f}_{i+1/2}^h)dt+\frac{\Delta t}{2}\left(\frac{h_{i,k}^{+(n+1)}}{\tau^{n+1}}+\frac{h_{i,k}^{+(n)}-h_{i,k}^n}{\tau^n}\right)\right],\\
+    b_{i,k}^{n+1} &= \left(1+\frac{\Delta t}{2\tau^{n+1}}\right)^{-1}\left[b_{i,k}^n+\frac{1}{\Delta x}\int_{t^n}^{t^{n+1}}({\bf f}_{i-1/2}^b-{\bf f}_{i+1/2}^b)dt+\frac{\Delta t}{2}\left(\frac{b_{i,k}^{+(n+1)}}{\tau^{n+1}}+\frac{b_{i,k}^{+(n)}-b_{i,k}^n}{\tau^n}\right)\right].\\
 \end{aligned} 
 $$
 
 \section{Boundary condition}
-Only isothermal wall boundary condition with complete accommodation is discussed. Assuming left wall($x=1/2$). The boundary condition described here is quiet simple, the incoming distribution function is directly obtained through interpolation. One can also use the same method as the inner region to calculate the incoming distribution and flux.
+Only isothermal wall boundary condition with complete accommodation is discussed. Assuming left wall ($x=1/2$). The boundary condition described here is quiet simple, the incoming distribution function is directly obtained through interpolation. This kind of boundary treatment is sufficient for Knudsen number case ${\rm Kn}=0.075, 1.0, 10.0$. For flow in continuum regime, one need to use the same method as the inner region to calculate the incoming distribution function and flux.
 
 First, obtain $h_k^{in},b_k^{in}$ by one-sided interpolation from the interior region. For example,
-$$h_{k}^{in} = h_{1,k}-\sigma_{1,k}^h\frac{\Delta x}{2}$$
+$$h_{k}^{in} = h_{1,k}-\sigma_{1,k}^h\frac{\Delta x}{2}.$$
 
-Second, calculate the density at the wall with the condition that no particle penetrating the wall
-$$\int_{t^n}^{t^{n+1}}\int_{u>0} ug_w d\Xi dt+\int_{t^n}^{t^{n+1}}\int_{u<0} uf^{in}d\Xi dt=0$$
-which gives
-$$\rho_w = -\frac{\sum\alpha_k u_k h_k^{in}}{\left(\frac{\lambda_w}{\pi}\right)^{1/2}\sum\alpha_k u_k e^{-\lambda_w(u_k-U_w)^2}}$$
+Second, calculate the density at the wall with the condition that no particle penetrating the wall,
+$$\int_{t^n}^{t^{n+1}}\int_{u>0} ug_w d\Xi dt+\int_{t^n}^{t^{n+1}}\int_{u<0} uf^{in}d\Xi dt=0,$$
+which gives,
+$$\rho_w = -\frac{\sum\alpha_k u_k h_k^{in}}{\left(\frac{\lambda_w}{\pi}\right)^{1/2}\sum\alpha_k u_k e^{-\lambda_w(u_k-U_w)^2}},$$
 where $g_w,\rho_w,\lambda_w,U_w$ are the variables at the wall.
 
 The corresponding reduced Maxwellian distribution at the wall $H_k^w,B_k^w$ is also obtained.
 
-Thirdly, the distribution function at the boundary interface is expressed by (same holds for $b_k$)
-$$h_k = H_k^wH[u_k]+h_k^{in}(1-H[u_k])$$
+Thirdly, the distribution function at the boundary interface is expressed by (same holds for $b_k$),
+$$h_k = H_k^wH[u_k]+h_k^{in}(1-H[u_k]).$$
 
-Finally, the flux across the wall is calculated by
+Finally, the flux across the wall is calculated by,
 $$
-{\bf W}_{1/2} = \Delta t
+{\bf F}_{1/2} = \Delta t
 \begin{pmatrix}
     \sum\alpha_k u_k h_k\\
     \sum\alpha_k u_k^2 h_k\\
     \sum\alpha_k \frac{1}{2}\left(u_k^3 h_k+u_k b_k\right)
-\end{pmatrix} 
+\end{pmatrix},
 $$
-and
+and,
 $$
 \begin{aligned}
-    {\bf F}_{1/2,k}^h &= \Delta t u_k h_k\\
-    {\bf F}_{1/2,k}^b &= \Delta t u_k b_k
+    \int_{t^n}^{t^{n+1}}{\bf f}_{1/2,k}^h dt &= \Delta t u_k h_k,\\
+    \int_{t^n}^{t^{n+1}}{\bf F}_{1/2,k}^b dt &= \Delta t u_k b_k.
 \end{aligned} 
 $$
 
 %code
-\chapter{UGKS Code}
+\chapter{UGKS Codes}
 \section{Usage}
 \subsection{Compiling}
 A makefile is provided to compile the program under Linux. If you are using any IDE (e.g. Visual Studio), use the compiling function provided by the IDE.
@@ -599,7 +607,7 @@ Just type the program name to run it under the bin directory, no input file or d
 The code will generate two files,
 \begin{itemize}
     \item *.hst : record the convergence history every 10 iterations.
-    \item *.rst : record the final result of the program.
+    \item *.dat : record the final result of the program.
 \end{itemize}
 Both files are in tecplot format and will be put into current working directory.
 
@@ -617,9 +625,9 @@ Once the flow condition before the normal shock is known (upstream), the flow va
 \begin{equation}
     \label{eq:normal_shock}
     \begin{aligned}
-        M_2 &= \sqrt{\frac{M_1^2(\gamma-1)+2}{2\gamma M_1^2-(\gamma-1)}}\\
-        \frac{\rho_2}{\rho_1} &= \frac{(\gamma+1)M_1^2}{(\gamma-1)M_1^2+2}\\
-        \frac{T_2}{T_1} &= \frac{(1+\frac{\gamma-1}{2}M_1^2)(\frac{2\gamma}{\gamma-1}M_1^2-1)}{M_1^2(\frac{2\gamma}{\gamma-1}+\frac{\gamma-1}{2})}
+        M_2 &= \sqrt{\frac{M_1^2(\gamma-1)+2}{2\gamma M_1^2-(\gamma-1)}},\\
+        \frac{\rho_2}{\rho_1} &= \frac{(\gamma+1)M_1^2}{(\gamma-1)M_1^2+2},\\
+        \frac{T_2}{T_1} &= \frac{(1+\frac{\gamma-1}{2}M_1^2)(\frac{2\gamma}{\gamma-1}M_1^2-1)}{M_1^2(\frac{2\gamma}{\gamma-1}+\frac{\gamma-1}{2})},
     \end{aligned}
 \end{equation}
 where $M_1,\rho_1,T_1$ are upstream Mach number, density and temperature. $M_2,\rho_2,T_2$ are downstream Mach number, density and temperature.
@@ -627,18 +635,18 @@ where $M_1,\rho_1,T_1$ are upstream Mach number, density and temperature. $M_2,\
 For shock structure calculation, the upstream and downstream conditions are specified at the two boundaries (via ghost cell). And the flux across the interfaces are calculated through the same method described in section \ref{sec:inner_flux}.
 
 In the UGKS1D code, the reference state is,
-$$L_\infty=l_{mfp,1},\quad T_\infty=T_1,\quad \rho_\infty = \rho_1$$
+$$L_\infty=l_{mfp,1},\quad T_\infty=T_1,\quad \rho_\infty = \rho_1,$$
 where $l_{mfp,1}$ is the upstream mean free path.
 
 There are several important options in the code,
 \begin{itemize}
     \item \textbf{method\_output}: the method to output the solution. If set to \hi{ORIGINAL}, the original nondimensionalized values will be written to the result file. If set to \hi{NORMALIZE}, the density will be normalized by $\rho = (\rho-\rho_1)/(\rho_2-\rho_1)$ and the temperature is also normalized by the same way
-    \item \textbf{mu\_ref}: the reference viscosity coefficient $\mu_\infty$. Can be specified directly or calculated through the provided function \hi{get\_mu}. This function calculate the viscosity coefficient through
-        $$\mu_\infty = \frac{5(\alpha+1)(\alpha+2)\sqrt{\pi}}{4\alpha(5-2\omega)(7-2\omega)}{\rm Kn}_\infty$$
+    \item \textbf{mu\_ref}: the reference viscosity coefficient $\mu_\infty$, which can be specified directly or calculated through the provided function \hi{get\_mu}. This function calculate the viscosity coefficient through,
+        $$\mu_\infty = \frac{5(\alpha+1)(\alpha+2)\sqrt{\pi}}{4\alpha(5-2\omega)(7-2\omega)}{\rm Kn}_\infty,$$
         where $\alpha,\omega$ are coefficients related to molecule model. 
 \end{itemize}
 
-The default settings in the code is for Argon shock structure calculation at ${\rm Ma}=8.0$, see \cite{Xu2011}
+The default settings in the code is for Argon shock structure calculation at ${\rm Ma}=8.0$, see \cite{Xu2011}.
 \begin{itemize}
     \item Argon gas with Prandlt number $\Pr=2.0/3.0$ and variable hard-sphere model $\omega=0.72$
     \item Mach number 8.0
@@ -660,27 +668,27 @@ Figure. \ref{pic:shock_solution} shows the comparison of the simulated density w
 \section{UGKS2D Code}
 \subsection{Differences with 1D}
 For 2D problem, many expressions need to be slightly changed. For example,
-$$g=\rho\left(\frac{\lambda}{\pi}\right)^{\frac{K+2}{2}}e^{-\lambda((u-U)^2+(v-V)^2+\xi^2)}$$
+$$g=\rho\left(\frac{\lambda}{\pi}\right)^{\frac{K+2}{2}}e^{-\lambda((u-U)^2+(v-V)^2+\xi^2)},$$
 where $v$ is particle velocity in y direction, $V$ is macroscopic velocity in y direction. 
 
-The relation between $K$ and $\gamma$ becomes
-$$\gamma=\frac{K+4}{K+2}$$
+The relation between $K$ and $\gamma$ becomes,
+$$\gamma=\frac{K+4}{K+2}.$$
 
-The reduced Maxwellian distribution becomes ($B$ is not changed)
-$$H=\int_{-\infty}^{\infty}gd\xi=\rho\left(\frac{\lambda}{\pi}\right)e^{-\lambda((u-U)^2+(v-V)^2)}$$
+The reduced Maxwellian distribution becomes ($B$ is not changed),
+$$H=\int_{-\infty}^{\infty}gd\xi=\rho\left(\frac{\lambda}{\pi}\right)e^{-\lambda((u-U)^2+(v-V)^2)}.$$
 
-The collision invariants are $\psi=(1,u,v,1/2(u^2+v^2+\xi^2))^T$. And the expressions for macroscopic variables are correspondingly changed. For example, the nondimensionalized pressure is calculated via
-$$\frac{K+2}{2}p=\int((u-U)^2+(v-V)^2)hdu+\int bdu$$
+The collision invariants are $\psi=(1,u,v,1/2(u^2+v^2+\xi^2))^T$. And the expressions for macroscopic variables are correspondingly changed. For example, the nondimensionalized pressure is calculated via,
+$$\frac{K+2}{2}p=\int((u-U)^2+(v-V)^2)hdu+\int bdu.$$
 
-When calculating the flux, the slopes related to Maxwellian becomes
-$$a=a_1+a_2u+a_3v+a_4\frac{1}{2}(u^2+v^2+\xi^2)$$
-and the components are calculated via
+When calculating the flux, the slopes related to Maxwellian become,
+$$a=a_1+a_2u+a_3v+a_4\frac{1}{2}(u^2+v^2+\xi^2),$$
+and the components are calculated via,
 $$
 \begin{aligned}
-    a_4&=\frac{4\lambda_0^2}{(K+2)\rho_0}\left[2\frac{\partial\rho E}{\partial x}+\left(U_0^2+V_0^2-\frac{K+2}{2\lambda_0}\right)\frac{\partial\rho}{\partial x}-2U_0\frac{\partial\rho U}{\partial x}-2V_0\frac{\partial\rho V}{\partial x}\right]\\
-    a_3&=\frac{2\lambda_0}{\rho_0}\left(\frac{\partial\rho V}{\partial x}-V_0\frac{\partial\rho}{\partial x}\right)-V_0a_4\\
-    a_2&=\frac{2\lambda_0}{\rho_0}\left(\frac{\partial\rho U}{\partial x}-U_0\frac{\partial\rho}{\partial x}\right)-U_0a_4\\
-    a_1&=\frac{1}{\rho_0}\frac{\partial\rho}{\partial x}-U_0a_2-V_0a_3-\frac{1}{2}\left(U_0^2+V_0^2+\frac{k+2}{2\lambda_0}\right)a_4
+    a_4&=\frac{4\lambda_0^2}{(K+2)\rho_0}\left[2\frac{\partial\rho E}{\partial x}+\left(U_0^2+V_0^2-\frac{K+2}{2\lambda_0}\right)\frac{\partial\rho}{\partial x}-2U_0\frac{\partial\rho U}{\partial x}-2V_0\frac{\partial\rho V}{\partial x}\right],\\
+    a_3&=\frac{2\lambda_0}{\rho_0}\left(\frac{\partial\rho V}{\partial x}-V_0\frac{\partial\rho}{\partial x}\right)-V_0a_4,\\
+    a_2&=\frac{2\lambda_0}{\rho_0}\left(\frac{\partial\rho U}{\partial x}-U_0\frac{\partial\rho}{\partial x}\right)-U_0a_4,\\
+    a_1&=\frac{1}{\rho_0}\frac{\partial\rho}{\partial x}-U_0a_2-V_0a_3-\frac{1}{2}\left(U_0^2+V_0^2+\frac{k+2}{2\lambda_0}\right)a_4.
 \end{aligned}
 $$
 
@@ -734,7 +742,7 @@ Figure. \ref{pic:cavity_solution} shows the result for the above setup, and comp
 \end{figure}
 
 \subsection{Other information}
-The Gaussian quadrature used in the code is from Table IIa of \cite{Shizgal1981}, which is better than Gaussian-Hermite quadrature in high Knudsen number. But for the cavity problem with ${\rm Kn}>=1$, Newton-Cotes formula of 61x61 velocity grids with velocity range $u,v=-4-4$ can avoid oscillating in the solution, which happens with Gaussian quadrature and second order interpolation. For example, the setting for Newton-Cotes integration
+The Gaussian quadrature used in the code is from Table IIa of \cite{Shizgal1981}, which is better than Gaussian-Hermite quadrature in high Knudsen number case. But for the cavity problem with ${\rm Kn}>=1$, Newton-Cotes formula of 61x61 velocity grids with velocity range $u,v=-4-4$ can avoid oscillating in the solution, which happens using Gaussian quadrature and second order interpolation. For example, the setting for Newton-Cotes integration
 
 \begin{minted}{fortran}
     subroutine init()
@@ -770,54 +778,54 @@ On Intel\textregistered\ Core\textsuperscript{\texttrademark} Quad Processor Q94
     \label{appendix:moments}
     In the program, the moments of Maxwellian distribution function is frequently used, and they are usually obtained from subroutines.
 
-    The moments of Maxwellian distribution function is defined as
-    $$\rho<...>=\int(...)gd\Xi$$
-    and have the property that
-    $$<u^n \xi^m> = <u^n><\xi^m>$$
+    The moments of Maxwellian distribution function is defined as,
+    $$\rho<...>=\int(...)gd\Xi,$$
+    and have the property that,
+    $$<u^n \xi^m> = <u^n><\xi^m>,$$
     where $m,n$ are integers.
 
     \section*{Moments of $\xi^m$}
-    $$<\xi^2>=\left(\frac{K}{2\lambda}\right),\quad <\xi^4>=\left(\frac{3K}{4\lambda^2}+\frac{K(K-1)}{4\lambda^2}\right)$$
+    $$<\xi^2>=\left(\frac{K}{2\lambda}\right),\quad <\xi^4>=\left(\frac{3K}{4\lambda^2}+\frac{K(K-1)}{4\lambda^2}\right).$$
 
     \section*{Moments of $u^n$}
-    The integration limits of $<u^n>$ is from $-\infty$ to $\infty$
+    The integration limits of $<u^n>$ is from $-\infty$ to $\infty$,
     $$
     \begin{aligned}
-        <u^0> &= 1\\
-        <u^1> &= U\\
-        <u^{n+2}> &= U<u^{n+1}>+\frac{n+1}{2\lambda}<u^n>
+        <u^0> &= 1,\\
+        <u^1> &= U,\\
+        <u^{n+2}> &= U<u^{n+1}>+\frac{n+1}{2\lambda}<u^n>.
     \end{aligned} 
     $$
     The integration limits of $<u^n>_{>0}$ is from $0$ to $\infty$,
     $$
     \begin{aligned}
-        <u^0>_{>0} &= \frac{1}{2}{\rm erfc}(-\sqrt{\lambda}U) \\
-        <u^1>_{>0} &= U<u^0>_{>0}+\frac{1}{2}\frac{e^{-\lambda U^2}}{\sqrt{\pi\lambda}} \\
-        <u^{n+2}>_{>0} &= U<u^{n+1}>_{>0}+\frac{n+1}{2\lambda}<u^n>_{>0}
+        <u^0>_{>0} &= \frac{1}{2}{\rm erfc}(-\sqrt{\lambda}U), \\
+        <u^1>_{>0} &= U<u^0>_{>0}+\frac{1}{2}\frac{e^{-\lambda U^2}}{\sqrt{\pi\lambda}}, \\
+        <u^{n+2}>_{>0} &= U<u^{n+1}>_{>0}+\frac{n+1}{2\lambda}<u^n>_{>0}.
     \end{aligned} 
     $$
     The integration limits of $<u^n>_{<0}$ is from $-\infty$ to $0$,
     $$
     \begin{aligned}
-        <u^0>_{<0} &= \frac{1}{2}{\rm erfc}(\sqrt{\lambda}U) \\
-        <u^1>_{<0} &= U<u^0>_{<0}-\frac{1}{2}\frac{e^{-\lambda U^2}}{\sqrt{\pi\lambda}} \\
-        <u^{n+2}>_{<0} &= U<u^{n+1}>_{<0}+\frac{n+1}{2\lambda}<u^n>_{<0}
+        <u^0>_{<0} &= \frac{1}{2}{\rm erfc}(\sqrt{\lambda}U), \\
+        <u^1>_{<0} &= U<u^0>_{<0}-\frac{1}{2}\frac{e^{-\lambda U^2}}{\sqrt{\pi\lambda}}, \\
+        <u^{n+2}>_{<0} &= U<u^{n+1}>_{<0}+\frac{n+1}{2\lambda}<u^n>_{<0}.
     \end{aligned} 
     $$
 
     \section*{Moments of $<u^n\xi^m\psi>$}
-    There are three components for 1D problem
+    There are three components for 1D problem,
     $$
     <u^n\xi^m\psi>=\begin{pmatrix}
         <u^n><\xi^m>\\
         <u^{n+1}><\xi^m>\\
         \frac{1}{2}\left(<u^{n+2}><\xi^m>+<u^n><\xi^{m+2}>\right)
-    \end{pmatrix} 
+    \end{pmatrix}.
     $$
 
     \section*{Moments of $<au^n\psi>$}
-    There are three components for 1D problem
-    $$<au^n\psi>=a_1<u^n\psi>+a_2<u^{n+1}\psi>+\frac{1}{2}a_3\left(<u^{n+2}\psi>+<u^n\xi^2\psi>\right)$$
+    There are three components for 1D problem,
+    $$<au^n\psi>=a_1<u^n\psi>+a_2<u^{n+1}\psi>+\frac{1}{2}a_3\left(<u^{n+2}\psi>+<u^n\xi^2\psi>\right).$$
 \end{appendices}
 
 %References
