@@ -37,7 +37,7 @@ module global_data
     real(kind=RKD) :: sim_time !current simulation time
     real(kind=RKD) :: max_time !maximum simulation time
     character(len=9),parameter :: HSTFILENAME = "shock.hst" !history file name
-    character(len=9),parameter :: RSTFILENAME = "shock.rst" !result file name
+    character(len=9),parameter :: RSTFILENAME = "shock.dat" !result file name
     integer :: iter !iteration
     integer :: method_output !output the solution with normalized value or not
 

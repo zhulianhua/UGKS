@@ -38,7 +38,7 @@ module global_data
     real(kind=RKD) :: eps !convergence criteria
     real(kind=RKD) :: sim_time !current simulation time
     character(len=10),parameter :: HSTFILENAME = "cavity.hst" !convergence history file name
-    character(len=10),parameter :: RSTFILENAME = "cavity.rst" !result file name
+    character(len=10),parameter :: RSTFILENAME = "cavity.dat" !result file name
     integer :: iter !iteration
     integer :: method_interp !interpolation method
     integer :: method_output !output as cell centered or point value
