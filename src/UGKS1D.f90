@@ -839,7 +839,7 @@ module io
             real(kind=RKD) :: prim_L(3), prim_R(3) !primary variables before and after shock
             real(kind=RKD) :: w_L(3), w_R(3) !conservative variables before and after shock
             real(kind=RKD),allocatable,dimension(:) :: H_L,B_L !distribution function before shock
-            real(kind=RKD),allocatable,dimension(:) :: H_R,B_R !distribution function before shock
+            real(kind=RKD),allocatable,dimension(:) :: H_R,B_R !distribution function after shock
             integer :: i
 
             !allocation
