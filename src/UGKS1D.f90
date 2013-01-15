@@ -679,7 +679,6 @@ module io
         !>main initialization subroutine
         !--------------------------------------------------
         subroutine init()
-            real(kind=RKD) :: init_gas(3) !initial condition
             real(kind=RKD) :: alpha_ref,omega_ref !molecule model coefficient in referece state
             real(kind=RKD) :: kn !Knudsen number in reference state
             real(kind=RKD) :: Ma !Mach number in front of shock
