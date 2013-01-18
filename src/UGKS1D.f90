@@ -70,7 +70,6 @@ module global_data
         real(kind=RKD) :: length !length
         !flow field
         real(kind=RKD) :: w(3) !density, x-momentum,total energy
-        real(kind=RKD) :: primary(2) !density,temperature
         real(kind=RKD),allocatable,dimension(:) :: h,b !distribution function
         real(kind=RKD),allocatable,dimension(:) :: sh,sb !slope of distribution function
     end type cell_center
@@ -683,7 +682,7 @@ module io
             real(kind=RKD) :: kn !Knudsen number in reference state
             real(kind=RKD) :: Ma !Mach number in front of shock
             real(kind=RKD) :: xlength !length of computational domain
-            real(kind=RKD) :: umin !smallest and largest discrete velocity (for newton-cotes)
+            real(kind=RKD) :: umin,umax !smallest and largest discrete velocity (for newton-cotes)
             real(kind=RKD) :: xscale !cell size/mean free path
 
             !control
@@ -891,32 +890,33 @@ module io
         !>write result
         !--------------------------------------------------
         subroutine output()
-            real(kind=RKD) :: rho_avg !average density
+            real(kind=RKD),dimension(:,:),allocatable :: solution
+            real(kind=RKD) :: rmid !average density
             real(kind=RKD) :: xmid !location of average density
             integer :: i
+            !--------------------------------------------------
+            !prepare solutions
+            !--------------------------------------------------
+            allocate(solution(2,ixmin-1:ixmax+1)) !including ghost cell
 
-            !--------------------------------------------------
-            !preparation
-            !--------------------------------------------------
-            !solution (with ghost cell)
             do i=ixmin-1,ixmax+1
-                ctr(i)%primary(1) = ctr(i)%w(1) !density
-                ctr(i)%primary(2) = get_temperature(ctr(i)%h,ctr(i)%b,get_primary(ctr(i)%w)) !temperature
+                solution(1,i) = ctr(i)%w(1) !density
+                solution(2,i) = get_temperature(ctr(i)%h,ctr(i)%b,get_primary(ctr(i)%w)) !temperature
             end do
 
             !find middle location - the location of average density
-            rho_avg = 0.5*(ctr(ixmin-1)%w(1)+ctr(ixmax+1)%w(1))
+            rmid = 0.5*(solution(1,ixmin-1)+solution(1,ixmax+1))
 
             do i=ixmin,ixmax
-                if ((ctr(i)%w(1)-rho_avg)*(ctr(i+1)%w(1)-rho_avg)<=0) then
-                    xmid = ctr(i)%x+(ctr(i+1)%x-ctr(i)%x)/(ctr(i+1)%w(1)-ctr(i)%w(1))*(rho_avg-ctr(i)%w(1))
+                if ((solution(1,i)-rmid)*(solution(1,i+1)-rmid)<=0) then
+                    xmid = ctr(i)%x+(ctr(i+1)%x-ctr(i)%x)/(solution(1,i+1)-solution(1,i))*(rmid-solution(1,i))
                 end if
             end do
 
             !normalization
             if (method_output==NORMALIZE) then
-                ctr%primary(1) = (ctr%primary(1)-ctr(ixmin-1)%primary(1))/(ctr(ixmax+1)%primary(1)-ctr(ixmin-1)%primary(1))
-                ctr%primary(2) = (ctr%primary(2)-ctr(ixmin-1)%primary(2))/(ctr(ixmax+1)%primary(2)-ctr(ixmin-1)%primary(2))
+                solution(1,:) = (solution(1,:)-solution(1,ixmin-1))/(solution(1,ixmax+1)-solution(1,ixmin-1))
+                solution(2,:) = (solution(2,:)-solution(2,ixmin-1))/(solution(2,ixmax+1)-solution(2,ixmin-1))
             end if
 
             !--------------------------------------------------
@@ -932,7 +932,7 @@ module io
 
             !write solution (cell-centered)
             do i=1,2
-                write(RSTFILE,"(6(ES23.16,2X))") ctr(ixmin:ixmax)%primary(i)
+                write(RSTFILE,"(6(ES23.16,2X))") solution(i,ixmin:ixmax)
             end do
     
             !close file
@@ -945,9 +945,7 @@ end module io
 !--------------------------------------------------
 program main
     use global_data
-    use tools
     use solver
-    use flux
     use io
     implicit none
 
