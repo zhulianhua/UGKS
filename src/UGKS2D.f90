@@ -82,7 +82,6 @@ module global_data
         real(kind=RKD) :: length(2) !length in i and j direction
         !flow field
         real(kind=RKD) :: w(4) !density, x-momentum, y-momentum, total energy
-        real(kind=RKD) :: primary(7) !density,u-velocity,v-velocity,pressure,temperature,x-heat flux,y-heat flux
         real(kind=RKD),allocatable,dimension(:,:) :: h,b !distribution function
         real(kind=RKD),allocatable,dimension(:,:,:) :: sh,sb !slope of distribution function in i and j direction
     end type cell_center
@@ -294,20 +293,20 @@ module tools
         end function get_heat_flux
 
         !--------------------------------------------------
-        !>get pressure
-        !>@param[in] h,b          :distribution function
-        !>@param[in] vn,vt        :normal and tangential velocity
-        !>@param[in] prim         :primary variables
-        !>@return    get_pressure :pressure
+        !>get temperature
+        !>@param[in] h,b             :distribution function
+        !>@param[in] vn,vt           :normal and tangential velocity
+        !>@param[in] prim            :primary variables
+        !>@return    get_temperature :temperature
         !--------------------------------------------------
-        function get_pressure(h,b,vn,vt,prim)
+        function get_temperature(h,b,vn,vt,prim)
             real(kind=RKD),dimension(:,:),intent(in) :: h,b
             real(kind=RKD),dimension(:,:),intent(in) :: vn,vt
             real(kind=RKD),intent(in) :: prim(4)
-            real(kind=RKD) :: get_pressure !pressure
+            real(kind=RKD) :: get_temperature
 
-            get_pressure = (sum(weight*((vn-prim(2))**2+(vt-prim(3))**2)*h)+sum(weight*b))/(ck+2)
-        end function get_pressure
+            get_temperature = 2.0*(sum(weight*((vn-prim(2))**2+(vt-prim(3))**2)*h)+sum(weight*b))/(ck+2)/prim(1)
+        end function get_temperature
 
         !--------------------------------------------------
         !>get the nondimensionalized viscosity coefficient
@@ -1230,17 +1229,22 @@ module io
         !>write result
         !--------------------------------------------------
         subroutine output()
+            real(kind=RKD),dimension(:,:,:),allocatable :: solution
             real(kind=RKD) :: prim(4) !primary variables
             integer :: i,j
+
+            !allocation
+            allocate(solution(7,ixmin:ixmax,iymin:iymax))
 
             !prepare solution
             do j=iymin,iymax
                 do i=ixmin,ixmax
                     prim = get_primary(ctr(i,j)%w) !primary variables
-                    ctr(i,j)%primary(1:3) = prim(1:3) !density,u,v
-                    ctr(i,j)%primary(4) = get_pressure(ctr(i,j)%h,ctr(i,j)%b,uspace,vspace,prim) !pressure
-                    ctr(i,j)%primary(5) = 2.0*ctr(i,j)%primary(4)/ctr(i,j)%primary(1) !temperature
-                    ctr(i,j)%primary(6:7) = get_heat_flux(ctr(i,j)%h,ctr(i,j)%b,uspace,vspace,prim) !heat flux
+
+                    solution(1:3,i,j) = prim(1:3) !density,u,v
+                    solution(4,i,j) = get_temperature(ctr(i,j)%h,ctr(i,j)%b,uspace,vspace,prim)
+                    solution(5,i,j) = 0.5*solution(4,i,j)*solution(1,i,j) !pressure
+                    solution(6:7,i,j) = get_heat_flux(ctr(i,j)%h,ctr(i,j)%b,uspace,vspace,prim)
                 end do
             end do
 
@@ -1267,7 +1271,7 @@ module io
 
             !write solution (cell-centered)
             do i=1,7
-                write(RSTFILE,"(6(ES23.16,2X))") ctr%primary(i)
+                write(RSTFILE,"(6(ES23.16,2X))") solution(i,:,:)
             end do
     
             !close file
@@ -1280,9 +1284,7 @@ end module io
 !--------------------------------------------------
 program main
     use global_data
-    use tools
     use solver
-    use flux
     use io
     implicit none
 
