@@ -1252,7 +1252,7 @@ module io
             open(unit=RSTFILE,file=RSTFILENAME,status="replace",action="write")
 
             !write header
-            write(RSTFILE,*) "VARIABLES = X, Y, RHO, U, V, P, T, QX, QY"
+            write(RSTFILE,*) "VARIABLES = X, Y, RHO, U, V, T, P, QX, QY"
 
             select case(method_output)
                 case(CENTER)
