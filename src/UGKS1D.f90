@@ -567,7 +567,6 @@ module solver
             real(kind=RKD),allocatable,dimension(:) :: H_old,B_old !equilibrium distribution at t=t^n
             real(kind=RKD),allocatable,dimension(:) :: H,B !equilibrium distribution at t=t^{n+1}
             real(kind=RKD),allocatable,dimension(:) :: H_plus,B_plus !Shakhov part
-            real(kind=RKD) :: w_old(3) !conservative variables at t^n
             real(kind=RKD) :: prim_old(3),prim(3) !primary variables at t^n and t^{n+1}
             real(kind=RKD) :: tau_old,tau !collision time and t^n and t^{n+1}
             real(kind=RKD) :: qf
@@ -581,14 +580,11 @@ module solver
             allocate(H_plus(unum))
             allocate(B_plus(unum))
 
-            !set initial value
             do i=ixmin,ixmax
                 !--------------------------------------------------
                 !store W^n and calculate H^n,B^n,\tau^n
                 !--------------------------------------------------
-                w_old = ctr(i)%w !store W^n
-                
-                prim_old = get_primary(w_old) !convert to primary variables
+                prim_old = get_primary(ctr(i)%w) !convert to primary variables
                 call discrete_maxwell(H_old,B_old,prim_old) !calculate Maxwellian
                 tau_old = get_tau(prim_old) !calculate collision time \tau^n
 
