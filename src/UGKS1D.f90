@@ -226,7 +226,7 @@ module tools
         function get_temperature(h,b,prim)
             real(kind=RKD),dimension(:),intent(in) :: h,b
             real(kind=RKD),intent(in) :: prim(3)
-            real(kind=RKD) :: get_temperature !pressure
+            real(kind=RKD) :: get_temperature
 
             get_temperature = 2.0*(sum(weight*(uspace-prim(2))**2*h)+sum(weight*b))/(ck+1)/prim(1)
         end function get_temperature
